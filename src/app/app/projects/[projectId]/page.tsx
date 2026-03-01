@@ -81,6 +81,10 @@ const LABEL_COLORS: Record<ItemLabel, string> = {
   Backend: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   Authentication: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   "API-Integration": "bg-orange-500/15 text-orange-700 dark:text-orange-300",
+  "IT Admin": "bg-slate-500/15 text-slate-700 dark:text-slate-300",
+  DevOps: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
+  Testing: "bg-pink-500/15 text-pink-700 dark:text-pink-300",
+  Documentation: "bg-teal-500/15 text-teal-700 dark:text-teal-300",
 };
 
 export default function ProjectDetailPage() {
