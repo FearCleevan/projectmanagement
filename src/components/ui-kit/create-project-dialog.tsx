@@ -26,9 +26,13 @@ type CreateProjectDialogProps = {
   open: boolean;
   defaultModule: ModuleType | null;
   ownerId: string;
+  projectToEdit?: Project | null;
   onOpenChange: (open: boolean) => void;
   onCreate: (project: Project) => void;
+  onUpdate?: (project: Project) => void;
 };
+
+const MAX_PROJECT_COVER_FILE_SIZE_BYTES = 1_500_000;
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -43,9 +47,12 @@ export function CreateProjectDialog({
   open,
   defaultModule,
   ownerId,
+  projectToEdit,
   onOpenChange,
   onCreate,
+  onUpdate,
 }: CreateProjectDialogProps) {
+  const isEditMode = Boolean(projectToEdit);
   const [step, setStep] = React.useState<Step>(1);
   const [modules, setModules] = React.useState<ModuleType[]>(defaultModule ? [defaultModule] : []);
   const [projectCode, setProjectCode] = React.useState("");
@@ -59,14 +66,28 @@ export function CreateProjectDialog({
       return;
     }
 
-    setStep(1);
-    setModules(defaultModule ? [defaultModule] : []);
-    setProjectCode("");
-    setTitle("");
-    setDescription("");
-    setCoverImage(undefined);
+    if (projectToEdit) {
+      setStep(2);
+      setModules(
+        projectToEdit.modules && projectToEdit.modules.length > 0
+          ? projectToEdit.modules
+          : [projectToEdit.module]
+      );
+      setProjectCode(projectToEdit.projectId);
+      setTitle(projectToEdit.title);
+      setDescription(projectToEdit.description ?? "");
+      setCoverImage(projectToEdit.coverImage);
+    } else {
+      setStep(1);
+      setModules(defaultModule ? [defaultModule] : []);
+      setProjectCode("");
+      setTitle("");
+      setDescription("");
+      setCoverImage(undefined);
+    }
+
     setIsSubmitting(false);
-  }, [defaultModule, open]);
+  }, [defaultModule, open, projectToEdit]);
 
   const toggleModule = (moduleOption: ModuleType) => {
     setModules((previous) => {
@@ -86,6 +107,12 @@ export function CreateProjectDialog({
 
     if (!file.type.startsWith("image/")) {
       toast.error("Please upload an image file.");
+      return;
+    }
+
+    if (file.size > MAX_PROJECT_COVER_FILE_SIZE_BYTES) {
+      toast.error("Image is too large. Please use a file under 1.5MB.");
+      event.target.value = "";
       return;
     }
 
@@ -133,24 +160,30 @@ export function CreateProjectDialog({
     setIsSubmitting(true);
 
     const now = new Date().toISOString();
-    const generatedId =
-      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : `project-${Date.now()}`;
-
-    onCreate({
-      id: generatedId,
+    const projectPayload: Project = {
+      id:
+        projectToEdit?.id ??
+        (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `project-${Date.now()}`),
       projectId: projectCode.trim().toUpperCase(),
       module: primaryModule,
       modules,
       title: title.trim(),
       description: description.trim() || undefined,
       coverImage,
-      ownerId,
-      memberIds: [],
-      createdAt: now,
+      ownerId: projectToEdit?.ownerId ?? ownerId,
+      memberIds: projectToEdit?.memberIds ?? [],
+      archived: projectToEdit?.archived,
+      createdAt: projectToEdit?.createdAt ?? now,
       updatedAt: now,
-    });
+    };
+
+    if (isEditMode) {
+      onUpdate?.(projectPayload);
+    } else {
+      onCreate(projectPayload);
+    }
 
     setIsSubmitting(false);
     onOpenChange(false);
@@ -160,11 +193,13 @@ export function CreateProjectDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl gap-6 p-6 sm:p-8">
         <DialogHeader className="text-left">
-          <DialogTitle>Create New Project</DialogTitle>
+          <DialogTitle>{isEditMode ? "Edit Project" : "Create New Project"}</DialogTitle>
           <DialogDescription>
             {step === 1
               ? "Step 1 of 2: Choose a module for this project."
-              : "Step 2 of 2: Add project details and create."}
+              : isEditMode
+                ? "Step 2 of 2: Update project details and save."
+                : "Step 2 of 2: Add project details and create."}
           </DialogDescription>
         </DialogHeader>
 
@@ -265,7 +300,7 @@ export function CreateProjectDialog({
             <Button onClick={handleNext}>Next</Button>
           ) : (
             <Button onClick={handleCreateProject} disabled={isSubmitting}>
-              {isSubmitting ? "Creating..." : "Create Project"}
+              {isSubmitting ? (isEditMode ? "Saving..." : "Creating...") : isEditMode ? "Save Changes" : "Create Project"}
             </Button>
           )}
         </DialogFooter>

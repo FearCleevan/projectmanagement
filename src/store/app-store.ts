@@ -21,6 +21,7 @@ const PROJECTS_SEED_KEY = "internal-pm-projects-seed";
 const ITEMS_SEED_KEY = "internal-pm-items-seed";
 const COMMENTS_SEED_KEY = "internal-pm-comments-seed";
 const ACTIVITIES_SEED_KEY = "internal-pm-activities-seed";
+const MAX_PERSISTED_DATA_URL_LENGTH = 120_000;
 
 type AppStoreState = {
   currentUser: User | null;
@@ -353,6 +354,18 @@ export const useAppStore = create<AppStore>()(
     {
       name: APP_STORE_KEY,
       storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        ...state,
+        projects: state.projects.map((project) => {
+          const coverImage = project.coverImage;
+          const shouldDropCover =
+            typeof coverImage === "string" &&
+            coverImage.startsWith("data:") &&
+            coverImage.length > MAX_PERSISTED_DATA_URL_LENGTH;
+
+          return shouldDropCover ? { ...project, coverImage: undefined } : project;
+        }),
+      }),
     }
   )
 );

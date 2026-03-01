@@ -33,9 +33,11 @@ export default function ProjectsPage() {
   const selectedModule = useAppStore((state) => state.selectedModule);
   const setSelectedModule = useAppStore((state) => state.setSelectedModule);
   const addProject = useAppStore((state) => state.addProject);
+  const setProjects = useAppStore((state) => state.setProjects);
   const archiveProject = useAppStore((state) => state.archiveProject);
   const deleteProject = useAppStore((state) => state.deleteProject);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false);
+  const [projectToEdit, setProjectToEdit] = React.useState<Project | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = React.useState(false);
   const [pendingAction, setPendingAction] = React.useState<"archive" | "delete" | null>(null);
   const [targetProject, setTargetProject] = React.useState<Project | null>(null);
@@ -69,7 +71,15 @@ export default function ProjectsPage() {
       return;
     }
 
+    setProjectToEdit(null);
     setIsCreateDialogOpen(true);
+  };
+
+  const handleProjectDialogOpenChange = (open: boolean) => {
+    setIsCreateDialogOpen(open);
+    if (!open) {
+      setProjectToEdit(null);
+    }
   };
 
   const handleCreateProject = (project: Project) => {
@@ -87,6 +97,27 @@ export default function ProjectsPage() {
     setSelectedModule(project.module);
     toast.success("Project created successfully.");
     router.push(`/app/projects/${project.id}`);
+  };
+
+  const handleEditProject = (project: Project) => {
+    if (!canManageProjects) {
+      toast.error("Only Owner/Admin can edit projects.");
+      return;
+    }
+
+    if (
+      projects.some(
+        (existingProject) =>
+          existingProject.id !== project.id && existingProject.projectId === project.projectId
+      )
+    ) {
+      toast.error("Project ID already exists. Please use a unique Project ID.");
+      return;
+    }
+
+    setProjects(projects.map((existingProject) => (existingProject.id === project.id ? project : existingProject)));
+    setSelectedModule(project.module);
+    toast.success("Project updated successfully.");
   };
 
   const openProjectActionConfirm = (project: Project, action: "archive" | "delete") => {
@@ -226,6 +257,15 @@ export default function ProjectsPage() {
                             <DropdownMenuItem
                               onClick={(event) => {
                                 event.preventDefault();
+                                setProjectToEdit(project);
+                                setIsCreateDialogOpen(true);
+                              }}
+                            >
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(event) => {
+                                event.preventDefault();
                                 openProjectActionConfirm(project, "archive");
                               }}
                             >
@@ -277,8 +317,10 @@ export default function ProjectsPage() {
           open={isCreateDialogOpen}
           defaultModule={activeModule}
           ownerId={currentUser.id}
-          onOpenChange={setIsCreateDialogOpen}
+          projectToEdit={projectToEdit}
+          onOpenChange={handleProjectDialogOpenChange}
           onCreate={handleCreateProject}
+          onUpdate={handleEditProject}
         />
       ) : null}
       <ConfirmDialog
