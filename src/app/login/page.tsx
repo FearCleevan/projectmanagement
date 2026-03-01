@@ -60,7 +60,10 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     const matchedUser = users.find(
-      (user) => user.email.toLowerCase() === normalizedEmail && user.password === password
+      (user) =>
+        !user.archived &&
+        user.email.toLowerCase() === normalizedEmail &&
+        user.password === password
     );
 
     if (!matchedUser) {

@@ -28,7 +28,9 @@ export type User = {
   email: string;
   password: string;
   role: Role;
+  position?: string;
   avatarUrl?: string;
+  archived?: boolean;
   createdAt: string;
 };
 
@@ -66,6 +68,10 @@ export const ITEM_LABELS = [
   "Backend",
   "Authentication",
   "API-Integration",
+  "IT Admin",
+  "DevOps",
+  "Testing",
+  "Documentation",
 ] as const;
 export type ItemLabel = (typeof ITEM_LABELS)[number];
 
@@ -107,7 +113,10 @@ export type ActivityAction =
   | "ITEM_ASSIGNED"
   | "ITEM_DESCRIPTION_UPDATED"
   | "COMMENT_ADDED"
-  | "USER_CREATED";
+  | "USER_CREATED"
+  | "USER_UPDATED"
+  | "USER_ARCHIVED"
+  | "USER_DELETED";
 
 export type ActivityLog = {
   id: string;

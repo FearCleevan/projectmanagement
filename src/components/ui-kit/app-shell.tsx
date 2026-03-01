@@ -68,7 +68,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const nextTheme = resolvedTheme === "dark" ? "light" : "dark";
   const [modulePickerOpen, setModulePickerOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
-  const [forceModuleSelection, setForceModuleSelection] = useState(false);
   const [draftModule, setDraftModule] = useState<ModuleType | null>(selectedModule);
   const moduleParam = searchParams.get("module");
   const moduleFromQuery = isModuleType(moduleParam) ? moduleParam : null;
@@ -90,17 +89,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const handleSwitchModuleClick = () => {
     setDraftModule(selectedModule);
-    setForceModuleSelection(false);
     setModulePickerOpen(true);
   };
 
   const handleModulePickerOpenChange = (open: boolean) => {
-    if (!open && forceModuleSelection && !selectedModule) {
-      return;
-    }
-
     if (!open) {
-      setForceModuleSelection(false);
       setDraftModule(selectedModule);
     }
 
@@ -114,7 +107,6 @@ export function AppShell({ children }: { children: ReactNode }) {
 
     setSelectedModule(draftModule);
     setModulePickerOpen(false);
-    setForceModuleSelection(false);
     toast.success(`${draftModule} module selected.`);
     router.push(`/app/projects?module=${encodeURIComponent(draftModule)}`);
   };
@@ -132,19 +124,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       setSelectedModule(moduleFromQuery);
     }
   }, [moduleFromQuery, pathname, selectedModule, setSelectedModule]);
-
-  useEffect(() => {
-    const needsModuleSelection =
-      (pathname === "/app" || pathname.startsWith("/app/projects")) &&
-      !selectedModule &&
-      !moduleFromQuery;
-
-    if (needsModuleSelection) {
-      setForceModuleSelection(true);
-      setDraftModule(null);
-      setModulePickerOpen(true);
-    }
-  }, [moduleFromQuery, pathname, selectedModule]);
 
   const isActivePath = (href: string) => {
     if (href === "/app") {
@@ -268,7 +247,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
       <ModulePickerDialog
         open={modulePickerOpen}
-        forceSelection={forceModuleSelection}
         selectedModule={draftModule}
         onSelectedModuleChange={setDraftModule}
         onContinue={handleModuleContinue}

@@ -41,6 +41,9 @@ type AppStoreActions = {
   archiveProject: (projectId: string) => void;
   deleteProject: (projectId: string) => void;
   addUser: (user: User) => void;
+  updateUser: (user: User) => void;
+  archiveUser: (userId: string) => void;
+  deleteUser: (userId: string) => void;
   addItem: (item: ProjectItem) => void;
   archiveItem: (itemId: string) => void;
   deleteItem: (itemId: string) => void;
@@ -194,6 +197,58 @@ export const useAppStore = create<AppStore>()(
             ...state.activities,
           ].slice(0, 200),
         })),
+      updateUser: (user) =>
+        set((state) => {
+          const target = state.users.find((candidate) => candidate.id === user.id);
+          if (!target) {
+            return state;
+          }
+
+          return {
+            users: state.users.map((candidate) => (candidate.id === user.id ? user : candidate)),
+            currentUser: state.currentUser?.id === user.id ? user : state.currentUser,
+            activities: [
+              makeActivity(state, "USER_UPDATED", `Updated user ${user.name} (${user.role}).`, "user", user.id),
+              ...state.activities,
+            ].slice(0, 200),
+          };
+        }),
+      archiveUser: (userId) =>
+        set((state) => {
+          const target = state.users.find((candidate) => candidate.id === userId);
+          if (!target || target.archived) {
+            return state;
+          }
+
+          return {
+            users: state.users.map((candidate) =>
+              candidate.id === userId ? { ...candidate, archived: true } : candidate
+            ),
+            currentUser: state.currentUser?.id === userId ? null : state.currentUser,
+            selectedModule: state.currentUser?.id === userId ? null : state.selectedModule,
+            activities: [
+              makeActivity(state, "USER_ARCHIVED", `Archived user ${target.name}.`, "user", userId),
+              ...state.activities,
+            ].slice(0, 200),
+          };
+        }),
+      deleteUser: (userId) =>
+        set((state) => {
+          const target = state.users.find((candidate) => candidate.id === userId);
+          if (!target) {
+            return state;
+          }
+
+          return {
+            users: state.users.filter((candidate) => candidate.id !== userId),
+            currentUser: state.currentUser?.id === userId ? null : state.currentUser,
+            selectedModule: state.currentUser?.id === userId ? null : state.selectedModule,
+            activities: [
+              makeActivity(state, "USER_DELETED", `Deleted user ${target.name}.`, "user", userId),
+              ...state.activities,
+            ].slice(0, 200),
+          };
+        }),
       addItem: (item) =>
         set((state) => {
           const project = state.projects.find((candidate) => candidate.id === item.projectId);
