@@ -7,10 +7,12 @@ import { toast } from "sonner";
 import {
   ITEM_LABELS,
   ITEM_STATUSES,
+  normalizeItemStatus,
   type Comment,
   type ItemLabel,
   type ItemPriority,
   type ItemStatus,
+  type Module,
   type ProjectItem,
   type Role,
   type User,
@@ -45,6 +47,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { useAppStore } from "@/store/app-store";
 
 const ITEM_PRIORITIES: ItemPriority[] = ["Low", "Medium", "High", "Urgent"];
 
@@ -53,9 +56,11 @@ type ItemSheetProps = {
   item: ProjectItem | null;
   role: Role | null;
   users: User[];
+  modules: Module[];
   comments: Comment[];
   currentUserId: string | null;
   onOpenChange: (open: boolean) => void;
+  onCreateItem: (item: ProjectItem) => void;
   onUpdate: (item: ProjectItem) => void;
   onAddComment: (comment: Comment) => void;
   onArchiveItem: (itemId: string) => void;
@@ -67,9 +72,11 @@ export function ItemSheet({
   item,
   role,
   users,
+  modules,
   comments,
   currentUserId,
   onOpenChange,
+  onCreateItem,
   onUpdate,
   onAddComment,
   onArchiveItem,
@@ -79,12 +86,17 @@ export function ItemSheet({
   const [newComment, setNewComment] = React.useState("");
   const isMember = role === "MEMBER";
   const canEditFull = role === "OWNER" || role === "ADMIN";
+  const canManageSubWork = canEditFull || isMember;
   const [itemActionDialogOpen, setItemActionDialogOpen] = React.useState(false);
   const [pendingItemAction, setPendingItemAction] = React.useState<"archive" | "delete" | null>(null);
+  const [subWorkTitle, setSubWorkTitle] = React.useState("");
+  const getChildItems = useAppStore((state) => state.getChildItems);
+  const calculateItemProgress = useAppStore((state) => state.calculateItemProgress);
 
   React.useEffect(() => {
     setDraft(item);
     setNewComment("");
+    setSubWorkTitle("");
   }, [item, open]);
 
   const itemComments = React.useMemo(() => {
@@ -96,6 +108,14 @@ export function ItemSheet({
       .filter((comment) => comment.itemId === item.id)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [comments, item]);
+
+  const childItems = React.useMemo(() => {
+    if (!item) {
+      return [];
+    }
+
+    return getChildItems(item.id);
+  }, [getChildItems, item]);
 
   const updateDraft = (patch: Partial<ProjectItem>) => {
     setDraft((current) => (current ? { ...current, ...patch } : current));
@@ -201,6 +221,54 @@ export function ItemSheet({
     onOpenChange(false);
   };
 
+  const handleQuickAddSubWork = () => {
+    if (!item || !currentUserId) {
+      return;
+    }
+
+    if (!subWorkTitle.trim()) {
+      toast.error("Sub-work title is required.");
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const generatedId =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `item-${Date.now()}`;
+    const nextChildIndex = childItems.length + 1;
+
+    onCreateItem({
+      id: generatedId,
+      ticketId: `${item.ticketId}.${nextChildIndex}`,
+      projectId: item.projectId,
+      moduleId: item.moduleId ?? null,
+      parentId: item.id,
+      title: subWorkTitle.trim(),
+      description: undefined,
+      status: "TODO",
+      priority: item.priority,
+      assigneeIds: [],
+      labelIds: [],
+      labels: [],
+      archived: false,
+      createdBy: currentUserId,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    setSubWorkTitle("");
+    toast.success("Sub-work item created.");
+  };
+
+  const handleToggleChildDone = (child: ProjectItem, checked: boolean) => {
+    onUpdate({
+      ...child,
+      status: checked ? "DONE" : "TODO",
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full overflow-hidden sm:max-w-2xl lg:max-w-3xl">
@@ -287,6 +355,28 @@ export function ItemSheet({
                       {ITEM_STATUSES.map((status) => (
                         <SelectItem key={status} value={status}>
                           {status}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Module</Label>
+                  <Select
+                    value={draft.moduleId ?? "none"}
+                    onValueChange={(value) =>
+                      updateDraft({ moduleId: value === "none" ? null : value })
+                    }
+                    disabled={!canEditFull}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Module</SelectItem>
+                      {modules.map((module) => (
+                        <SelectItem key={module.id} value={module.id}>
+                          {module.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -407,6 +497,77 @@ export function ItemSheet({
                     )}
                   </div>
                 </ScrollArea>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Sub-Work Items</Label>
+                  <Badge variant="outline">{childItems.length}</Badge>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="+ Add sub-work item"
+                      value={subWorkTitle}
+                      onChange={(event) => setSubWorkTitle(event.target.value)}
+                      disabled={!canManageSubWork}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleQuickAddSubWork}
+                      disabled={!canManageSubWork}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                  <div className="space-y-2 rounded-md border p-2">
+                    {childItems.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No sub-work items yet.</p>
+                    ) : (
+                      childItems.map((child) => {
+                        const hasNestedChildren = getChildItems(child.id).length > 0;
+                        const progress = hasNestedChildren ? calculateItemProgress(child.id) : 0;
+
+                        return (
+                          <div
+                            key={child.id}
+                            className="space-y-2 rounded border bg-muted/20 px-2 py-2"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  checked={normalizeItemStatus(child.status) === "DONE"}
+                                  onCheckedChange={(checked) =>
+                                    handleToggleChildDone(child, checked === true)
+                                  }
+                                  disabled={!canManageSubWork}
+                                />
+                                <span className="text-sm font-medium">{child.title}</span>
+                              </div>
+                              <Badge variant="outline">{child.status}</Badge>
+                            </div>
+                            {hasNestedChildren ? (
+                              <div className="space-y-1">
+                                <div className="h-1.5 w-full rounded bg-muted">
+                                  <div
+                                    className="h-1.5 rounded bg-primary"
+                                    style={{ width: `${progress}%` }}
+                                  />
+                                </div>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Progress: {progress}%
+                                </p>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </ScrollArea>

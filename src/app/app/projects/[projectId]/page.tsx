@@ -5,6 +5,8 @@ import * as React from "react";
 import { useParams } from "next/navigation";
 import {
   CalendarDays,
+  ChevronDown,
+  ChevronRight,
   GripVertical,
   KanbanSquare,
   List,
@@ -28,6 +30,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
 
+import { CreateModuleDialog } from "@/components/ui-kit/create-module-dialog";
 import { CreateItemDialog } from "@/components/ui-kit/create-item-dialog";
 import { EmptyState } from "@/components/ui-kit/empty-state";
 import { ItemSheet } from "@/components/ui-kit/item-sheet";
@@ -65,6 +68,7 @@ import { useAppStore } from "@/store/app-store";
 import {
   ITEM_STATUSES,
   type ItemLabel,
+  type Module,
   type ItemPriority,
   type ItemStatus,
   type ProjectItem,
@@ -94,10 +98,14 @@ export default function ProjectDetailPage() {
 
   const currentUser = useAppStore((state) => state.currentUser);
   const projects = useAppStore((state) => state.projects);
+  const modules = useAppStore((state) => state.modules);
   const items = useAppStore((state) => state.items);
   const users = useAppStore((state) => state.users);
   const comments = useAppStore((state) => state.comments);
-  const addItem = useAppStore((state) => state.addItem);
+  const createModule = useAppStore((state) => state.createModule);
+  const createItem = useAppStore((state) => state.createItem);
+  const calculateItemProgress = useAppStore((state) => state.calculateItemProgress);
+  const calculateModuleProgress = useAppStore((state) => state.calculateModuleProgress);
   const archiveItem = useAppStore((state) => state.archiveItem);
   const deleteItem = useAppStore((state) => state.deleteItem);
   const updateItem = useAppStore((state) => state.updateItem);
@@ -106,8 +114,11 @@ export default function ProjectDetailPage() {
   const [query, setQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<string>(ALL_FILTER);
   const [priorityFilter, setPriorityFilter] = React.useState<string>(ALL_FILTER);
+  const [moduleFilter, setModuleFilter] = React.useState<string>(ALL_FILTER);
+  const [createModuleDialogOpen, setCreateModuleDialogOpen] = React.useState(false);
   const [newItemDialogOpen, setNewItemDialogOpen] = React.useState(false);
   const [itemSheetOpen, setItemSheetOpen] = React.useState(false);
+  const [expanded, setExpanded] = React.useState<Record<string, boolean>>({});
   const [activeItemId, setActiveItemId] = React.useState<string | null>(null);
   const [draggingItemId, setDraggingItemId] = React.useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -118,6 +129,20 @@ export default function ProjectDetailPage() {
   );
 
   const canCreateItems = currentUser?.role === "OWNER" || currentUser?.role === "ADMIN";
+  const canManageModules = canCreateItems;
+
+  const projectModules = React.useMemo(() => {
+    if (!project) {
+      return [];
+    }
+
+    return modules.filter((module) => module.projectId === project.id);
+  }, [modules, project]);
+
+  const moduleById = React.useMemo(
+    () => new Map(projectModules.map((module) => [module.id, module])),
+    [projectModules]
+  );
 
   const projectItems = React.useMemo(() => {
     if (!project) {
@@ -144,17 +169,38 @@ export default function ProjectDetailPage() {
         toPlainText(item.description ?? "").toLowerCase().includes(query.toLowerCase());
       const matchesStatus = statusFilter === ALL_FILTER || item.status === statusFilter;
       const matchesPriority = priorityFilter === ALL_FILTER || item.priority === priorityFilter;
+      const matchesModule =
+        moduleFilter === ALL_FILTER || (item.moduleId ?? "none") === moduleFilter;
 
-      return matchesQuery && matchesStatus && matchesPriority;
+      return matchesQuery && matchesStatus && matchesPriority && matchesModule;
     });
-  }, [priorityFilter, projectItems, query, statusFilter]);
+  }, [moduleFilter, priorityFilter, projectItems, query, statusFilter]);
+
+  const filteredRoots = React.useMemo(
+    () => filteredItems.filter((item) => item.parentId == null),
+    [filteredItems]
+  );
+
+  const childrenByParentId = React.useMemo(() => {
+    const map = new Map<string, ProjectItem[]>();
+    for (const item of filteredItems) {
+      if (!item.parentId) {
+        continue;
+      }
+
+      const children = map.get(item.parentId) ?? [];
+      children.push(item);
+      map.set(item.parentId, children);
+    }
+    return map;
+  }, [filteredItems]);
 
   const groupedForKanban = React.useMemo(() => {
     return STATUSES.map((status) => ({
       status,
-      items: filteredItems.filter((item) => item.status === status),
+      items: filteredRoots.filter((item) => item.status === status),
     }));
-  }, [filteredItems]);
+  }, [filteredRoots]);
 
   const usersById = React.useMemo(
     () => new Map(users.map((user) => [user.id, user])),
@@ -181,8 +227,26 @@ export default function ProjectDetailPage() {
       return;
     }
 
-    addItem(item);
+    createItem(item);
     toast.success("Item created.");
+  };
+
+  const handleCreateModule = (module: Module) => {
+    if (!canManageModules) {
+      toast.error("Only Owner/Admin can create modules.");
+      return;
+    }
+
+    const normalizedName = module.name.trim().toLowerCase();
+    if (
+      projectModules.some((projectModule) => projectModule.name.trim().toLowerCase() === normalizedName)
+    ) {
+      toast.error("A module with this name already exists.");
+      return;
+    }
+
+    createModule(module);
+    toast.success("Module created.");
   };
 
   const handleOpenItem = (itemId: string) => {
@@ -292,6 +356,57 @@ export default function ProjectDetailPage() {
       </Card>
 
       <Card className="border shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between gap-3 pb-2">
+          <CardTitle className="text-base">Modules</CardTitle>
+          {canManageModules ? (
+            <Button size="sm" onClick={() => setCreateModuleDialogOpen(true)}>
+              <Plus className="mr-2 size-4" />
+              Create Module
+            </Button>
+          ) : null}
+        </CardHeader>
+        <CardContent>
+          {projectModules.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No modules yet. Create one to organize work.
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {projectModules.map((module) => {
+                const rootItems = projectItems.filter(
+                  (item) => item.moduleId === module.id && !item.parentId
+                );
+                const progress = calculateModuleProgress(module.id);
+
+                return (
+                  <Card key={module.id} className="border">
+                    <CardContent className="space-y-3 p-4">
+                      <div className="space-y-1">
+                        <p className="font-medium">{module.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDateRange(module.startDate, module.endDate)}
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="h-2 w-full rounded bg-muted">
+                          <div
+                            className="h-2 rounded bg-primary"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground">{progress}% complete</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{rootItems.length} root items</p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border shadow-sm">
         <CardContent className="p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <div className="relative flex-1">
@@ -329,6 +444,19 @@ export default function ProjectDetailPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={moduleFilter} onValueChange={setModuleFilter}>
+              <SelectTrigger className="w-full lg:w-[180px]">
+                <SelectValue placeholder="Filter module" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_FILTER}>All Modules</SelectItem>
+                {projectModules.map((module) => (
+                  <SelectItem key={module.id} value={module.id}>
+                    {module.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {canCreateItems ? (
               <Button onClick={handleNewItem} className="w-full lg:w-auto">
                 <Plus className="mr-2 size-4" />
@@ -360,7 +488,7 @@ export default function ProjectDetailPage() {
         </TabsList>
 
         <TabsContent value="table">
-          {filteredItems.length === 0 ? (
+          {filteredRoots.length === 0 ? (
             <EmptyState
               icon={ListTodo}
               title="No items in table view"
@@ -374,12 +502,14 @@ export default function ProjectDetailPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-10" />
                       <TableHead>Work Items</TableHead>
+                      <TableHead>Progress</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Priority</TableHead>
                       <TableHead>Assignees</TableHead>
                       <TableHead>Labels</TableHead>
-                      <TableHead>Modules</TableHead>
+                      <TableHead>Module</TableHead>
                       <TableHead>Start Date</TableHead>
                       <TableHead>Due Date</TableHead>
                       <TableHead>Created On</TableHead>
@@ -387,105 +517,24 @@ export default function ProjectDetailPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredItems.map((item) => (
-                      <TableRow
+                    {filteredRoots.map((item) => (
+                      <ItemRow
                         key={item.id}
-                        className="cursor-pointer"
-                        onClick={() => handleOpenItem(item.id)}
-                      >
-                        <TableCell>
-                          <div className="space-y-1">
-                            <p className="text-xs font-medium text-muted-foreground">
-                              {item.ticketId || `${projectCode}-${projectItems.findIndex((candidate) => candidate.id === item.id) + 1}`}
-                            </p>
-                            <p className="font-medium">{item.title}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div onClick={(event) => event.stopPropagation()}>
-                            <Select
-                              value={item.status}
-                              onValueChange={(value) =>
-                                handleInlineStatusChange(item, value as ItemStatus)
-                              }
-                            >
-                              <SelectTrigger className="h-8 w-[150px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {STATUSES.map((status) => (
-                                  <SelectItem key={status} value={status}>
-                                    {status}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </TableCell>
-                        <TableCell>{item.priority}</TableCell>
-                        <TableCell>
-                          {item.assigneeIds.length === 0 ? (
-                            <span className="text-xs text-muted-foreground">Unassigned</span>
-                          ) : (
-                            <AvatarGroup>
-                              {item.assigneeIds.slice(0, 3).map((assigneeId) => {
-                                const assignee = usersById.get(assigneeId);
-                                return (
-                                  <Tooltip key={assigneeId}>
-                                    <TooltipTrigger asChild>
-                                      <Avatar size="sm">
-                                        <AvatarImage src={assignee?.avatarUrl} />
-                                        <AvatarFallback>
-                                          {getInitials(assignee?.name)}
-                                        </AvatarFallback>
-                                      </Avatar>
-                                    </TooltipTrigger>
-                                    <TooltipContent>{assignee?.name ?? "Unknown User"}</TooltipContent>
-                                  </Tooltip>
-                                );
-                              })}
-                              {item.assigneeIds.length > 3 ? (
-                                <AvatarGroupCount className="size-6 text-xs">+{item.assigneeIds.length - 3}</AvatarGroupCount>
-                              ) : null}
-                            </AvatarGroup>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap items-center gap-1">
-                            {(item.labels ?? []).length === 0 ? (
-                              <span className="text-xs text-muted-foreground">No Labels</span>
-                            ) : (
-                              (item.labels ?? []).map((label) => (
-                                <Badge
-                                  key={label}
-                                  variant="outline"
-                                  className={LABEL_COLORS[label as ItemLabel]}
-                                >
-                                  <Tag className="mr-1 size-3" />
-                                  {label}
-                                </Badge>
-                              ))
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>{project.module}</TableCell>
-                        <TableCell>{formatDate(item.startDate)}</TableCell>
-                        <TableCell>{formatDate(item.dueDate)}</TableCell>
-                        <TableCell>{formatDate(item.createdAt)}</TableCell>
-                        <TableCell>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs">
-                                <User className="size-3.5 text-muted-foreground" />
-                                {getInitials(usersById.get(item.createdBy)?.name)}
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {usersById.get(item.createdBy)?.name ?? "Unknown User"}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
+                        item={item}
+                        level={0}
+                        projectCode={projectCode}
+                        projectItems={projectItems}
+                        moduleById={moduleById}
+                        usersById={usersById}
+                        childrenByParentId={childrenByParentId}
+                        expanded={expanded}
+                        onToggleExpand={(itemId) =>
+                          setExpanded((current) => ({ ...current, [itemId]: !current[itemId] }))
+                        }
+                        onOpenItem={handleOpenItem}
+                        onInlineStatusChange={handleInlineStatusChange}
+                        calculateItemProgress={calculateItemProgress}
+                      />
                     ))}
                   </TableBody>
                 </Table>
@@ -588,7 +637,7 @@ export default function ProjectDetailPage() {
 
                       <div className="space-y-1">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Module</p>
-                        <span className="text-xs">{project.module}</span>
+                        <span className="text-xs">{item.moduleId ? moduleById.get(item.moduleId)?.name ?? "--" : "--"}</span>
                       </div>
 
                       <div className="space-y-1">
@@ -632,7 +681,7 @@ export default function ProjectDetailPage() {
                   items={column.items}
                   onOpenItem={handleOpenItem}
                   usersById={usersById}
-                  moduleName={project.module}
+                  modulesById={moduleById}
                 />
               ))}
               </div>
@@ -663,19 +712,29 @@ export default function ProjectDetailPage() {
           existingTicketIds={projectItems.map((item) => item.ticketId).filter(Boolean)}
           projectId={project.id}
           creatorId={currentUser.id}
+          modules={projectModules}
+          items={projectItems}
           users={users}
           onOpenChange={setNewItemDialogOpen}
           onCreate={handleCreateItem}
         />
       ) : null}
+      <CreateModuleDialog
+        open={createModuleDialogOpen}
+        projectId={project.id}
+        onOpenChange={setCreateModuleDialogOpen}
+        onCreate={handleCreateModule}
+      />
       <ItemSheet
         open={itemSheetOpen}
         item={activeItem}
         role={currentUser?.role ?? null}
         users={users}
+        modules={projectModules}
         comments={comments}
         currentUserId={currentUser?.id ?? null}
         onOpenChange={setItemSheetOpen}
+        onCreateItem={handleCreateItem}
         onUpdate={updateItem}
         onAddComment={addComment}
         onArchiveItem={archiveItem}
@@ -698,6 +757,16 @@ function formatDate(value?: string) {
   return date.toLocaleDateString();
 }
 
+function formatDateRange(startDate?: string, endDate?: string) {
+  if (!startDate && !endDate) {
+    return "No dates";
+  }
+
+  const start = startDate ? formatDate(startDate) : "No start";
+  const end = endDate ? formatDate(endDate) : "No end";
+  return `${start} - ${end}`;
+}
+
 function toPlainText(value: string) {
   return value
     .replace(/<[^>]*>/g, " ")
@@ -717,18 +786,179 @@ function getInitials(name?: string) {
   );
 }
 
+function ItemRow({
+  item,
+  level,
+  projectCode,
+  projectItems,
+  moduleById,
+  usersById,
+  childrenByParentId,
+  expanded,
+  onToggleExpand,
+  onOpenItem,
+  onInlineStatusChange,
+  calculateItemProgress,
+}: {
+  item: ProjectItem;
+  level: number;
+  projectCode: string;
+  projectItems: ProjectItem[];
+  moduleById: Map<string, Module>;
+  usersById: Map<string, DomainUser>;
+  childrenByParentId: Map<string, ProjectItem[]>;
+  expanded: Record<string, boolean>;
+  onToggleExpand: (itemId: string) => void;
+  onOpenItem: (itemId: string) => void;
+  onInlineStatusChange: (item: ProjectItem, nextStatus: ItemStatus) => void;
+  calculateItemProgress: (itemId: string) => number;
+}) {
+  const children = childrenByParentId.get(item.id) ?? [];
+  const hasChildren = children.length > 0;
+  const isExpanded = Boolean(expanded[item.id]);
+  const progress = calculateItemProgress(item.id);
+
+  return (
+    <>
+      <TableRow className="cursor-pointer" onClick={() => onOpenItem(item.id)}>
+        <TableCell>
+          {hasChildren ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleExpand(item.id);
+              }}
+            >
+              {isExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+            </Button>
+          ) : null}
+        </TableCell>
+        <TableCell>
+          <div className="space-y-1" style={{ paddingLeft: `${level * 20}px` }}>
+            <p className="text-xs font-medium text-muted-foreground">
+              {item.ticketId || `${projectCode}-${projectItems.findIndex((candidate) => candidate.id === item.id) + 1}`}
+            </p>
+            <p className="font-medium">{item.title}</p>
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="space-y-1">
+            <div className="h-1.5 w-20 rounded bg-muted">
+              <div className="h-1.5 rounded bg-primary" style={{ width: `${progress}%` }} />
+            </div>
+            <p className="text-[11px] text-muted-foreground">{progress}%</p>
+          </div>
+        </TableCell>
+        <TableCell>
+          <div onClick={(event) => event.stopPropagation()}>
+            <Select value={item.status} onValueChange={(value) => onInlineStatusChange(item, value as ItemStatus)}>
+              <SelectTrigger className="h-8 w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUSES.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {status}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </TableCell>
+        <TableCell>{item.priority}</TableCell>
+        <TableCell>
+          {item.assigneeIds.length === 0 ? (
+            <span className="text-xs text-muted-foreground">Unassigned</span>
+          ) : (
+            <AvatarGroup>
+              {item.assigneeIds.slice(0, 3).map((assigneeId) => {
+                const assignee = usersById.get(assigneeId);
+                return (
+                  <Tooltip key={assigneeId}>
+                    <TooltipTrigger asChild>
+                      <Avatar size="sm">
+                        <AvatarImage src={assignee?.avatarUrl} />
+                        <AvatarFallback>{getInitials(assignee?.name)}</AvatarFallback>
+                      </Avatar>
+                    </TooltipTrigger>
+                    <TooltipContent>{assignee?.name ?? "Unknown User"}</TooltipContent>
+                  </Tooltip>
+                );
+              })}
+              {item.assigneeIds.length > 3 ? (
+                <AvatarGroupCount className="size-6 text-xs">+{item.assigneeIds.length - 3}</AvatarGroupCount>
+              ) : null}
+            </AvatarGroup>
+          )}
+        </TableCell>
+        <TableCell>
+          <div className="flex flex-wrap items-center gap-1">
+            {(item.labels ?? []).length === 0 ? (
+              <span className="text-xs text-muted-foreground">No Labels</span>
+            ) : (
+              (item.labels ?? []).map((label) => (
+                <Badge key={label} variant="outline" className={LABEL_COLORS[label as ItemLabel]}>
+                  <Tag className="mr-1 size-3" />
+                  {label}
+                </Badge>
+              ))
+            )}
+          </div>
+        </TableCell>
+        <TableCell>{item.moduleId ? moduleById.get(item.moduleId)?.name ?? "--" : "--"}</TableCell>
+        <TableCell>{formatDate(item.startDate)}</TableCell>
+        <TableCell>{formatDate(item.dueDate)}</TableCell>
+        <TableCell>{formatDate(item.createdAt)}</TableCell>
+        <TableCell>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs">
+                <User className="size-3.5 text-muted-foreground" />
+                {getInitials(usersById.get(item.createdBy)?.name)}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>{usersById.get(item.createdBy)?.name ?? "Unknown User"}</TooltipContent>
+          </Tooltip>
+        </TableCell>
+      </TableRow>
+      {isExpanded
+        ? children.map((child) => (
+            <ItemRow
+              key={child.id}
+              item={child}
+              level={level + 1}
+              projectCode={projectCode}
+              projectItems={projectItems}
+              moduleById={moduleById}
+              usersById={usersById}
+              childrenByParentId={childrenByParentId}
+              expanded={expanded}
+              onToggleExpand={onToggleExpand}
+              onOpenItem={onOpenItem}
+              onInlineStatusChange={onInlineStatusChange}
+              calculateItemProgress={calculateItemProgress}
+            />
+          ))
+        : null}
+    </>
+  );
+}
+
 function KanbanColumn({
   status,
   items,
   onOpenItem,
   usersById,
-  moduleName,
+  modulesById,
 }: {
   status: ItemStatus;
   items: ProjectItem[];
   onOpenItem: (itemId: string) => void;
   usersById: Map<string, DomainUser>;
-  moduleName: string;
+  modulesById: Map<string, Module>;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `column-${status}`,
@@ -758,7 +988,7 @@ function KanbanColumn({
               item={item}
               onOpenItem={onOpenItem}
               usersById={usersById}
-              moduleName={moduleName}
+              moduleName={item.moduleId ? modulesById.get(item.moduleId)?.name ?? "--" : "--"}
             />
           ))
         )}
@@ -875,3 +1105,5 @@ function KanbanCard({
     </Card>
   );
 }
+
+

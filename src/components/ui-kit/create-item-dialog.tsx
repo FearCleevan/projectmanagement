@@ -9,6 +9,7 @@ import {
   type ItemLabel,
   type ItemPriority,
   type ItemStatus,
+  type Module,
   type ProjectItem,
   type User,
 } from "@/types/domain";
@@ -40,6 +41,8 @@ type CreateItemDialogProps = {
   existingTicketIds: string[];
   projectId: string;
   creatorId: string;
+  modules: Module[];
+  items: ProjectItem[];
   users: User[];
   onOpenChange: (open: boolean) => void;
   onCreate: (item: ProjectItem) => void;
@@ -51,6 +54,8 @@ export function CreateItemDialog({
   existingTicketIds,
   projectId,
   creatorId,
+  modules,
+  items,
   users,
   onOpenChange,
   onCreate,
@@ -60,8 +65,22 @@ export function CreateItemDialog({
   const [priority, setPriority] = React.useState<ItemPriority>("Medium");
   const [labels, setLabels] = React.useState<ItemLabel[]>([]);
   const [assigneeIds, setAssigneeIds] = React.useState<string[]>([]);
+  const [parentId, setParentId] = React.useState<string>("none");
+  const [moduleId, setModuleId] = React.useState<string>("none");
   const [startDate, setStartDate] = React.useState("");
   const [dueDate, setDueDate] = React.useState("");
+
+  const parentCandidates = React.useMemo(
+    () =>
+      items.filter(
+        (item) => item.projectId === projectId && !item.archived && (item.parentId == null)
+      ),
+    [items, projectId]
+  );
+  const selectedParent = React.useMemo(
+    () => parentCandidates.find((item) => item.id === parentId) ?? null,
+    [parentCandidates, parentId]
+  );
 
   React.useEffect(() => {
     if (!open) {
@@ -73,9 +92,19 @@ export function CreateItemDialog({
     setPriority("Medium");
     setLabels([]);
     setAssigneeIds([]);
+    setParentId("none");
+    setModuleId("none");
     setStartDate("");
     setDueDate("");
   }, [open]);
+
+  React.useEffect(() => {
+    if (!selectedParent) {
+      return;
+    }
+
+    setModuleId(selectedParent.moduleId ?? "none");
+  }, [selectedParent]);
 
   const toggleAssignee = (userId: string, checked: boolean) => {
     if (checked) {
@@ -130,8 +159,11 @@ export function CreateItemDialog({
       ticketId: generateNextTicketId(),
       projectId,
       title: title.trim(),
+      moduleId: moduleId === "none" ? null : moduleId,
+      parentId: parentId === "none" ? null : parentId,
       status,
       priority,
+      labelIds: labels,
       labels,
       assigneeIds,
       startDate: startDate || undefined,
@@ -174,6 +206,45 @@ export function CreateItemDialog({
                   {ITEM_STATUSES.map((option) => (
                     <SelectItem key={option} value={option}>
                       {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Parent Item (optional)</Label>
+              <Select value={parentId} onValueChange={setParentId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select parent item" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Parent</SelectItem>
+                  {parentCandidates.map((parent) => (
+                    <SelectItem key={parent.id} value={parent.id}>
+                      {parent.ticketId} - {parent.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Module</Label>
+              <Select
+                value={moduleId}
+                onValueChange={setModuleId}
+                disabled={Boolean(selectedParent)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select module" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Module</SelectItem>
+                  {modules.map((module) => (
+                    <SelectItem key={module.id} value={module.id}>
+                      {module.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

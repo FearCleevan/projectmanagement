@@ -1,4 +1,12 @@
-import type { Comment, Project, ProjectItem, User } from "@/types/domain";
+import {
+  normalizeItemPriority,
+  normalizeItemStatus,
+  type Comment,
+  type Module,
+  type Project,
+  type ProjectItem,
+  type User,
+} from "@/types/domain";
 
 const seededAt = "2026-03-01T00:00:00.000Z";
 
@@ -60,14 +68,39 @@ export const demoProjectsSeed: Project[] = [
   },
 ];
 
+function slugifyModuleName(name: string) {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function buildModulesFromProjects(projects: Project[]): Module[] {
+  return projects.flatMap((project) => {
+    const modules = project.modules && project.modules.length > 0 ? project.modules : [project.module];
+    return modules.map((moduleName) => ({
+      id: `module-${project.id}-${slugifyModuleName(moduleName)}`,
+      projectId: project.id,
+      name: moduleName,
+      createdAt: project.createdAt,
+    }));
+  });
+}
+
+export const demoModulesSeed: Module[] = buildModulesFromProjects(demoProjectsSeed);
+
 export const demoItemsSeed: ProjectItem[] = [
   {
     id: "item-portal-kickoff",
     ticketId: "PRODUCT-1",
     projectId: "project-product-portal",
+    moduleId: "module-project-product-portal-product",
+    parentId: null,
     title: "Kickoff scope alignment",
-    status: "Inprogress",
-    priority: "High",
+    status: "IN_PROGRESS",
+    priority: "HIGH",
+    labelIds: ["UI/UX", "Frontend"],
     labels: ["UI/UX", "Frontend"],
     assigneeIds: ["user-admin-demo"],
     startDate: "2026-03-02",
@@ -80,9 +113,12 @@ export const demoItemsSeed: ProjectItem[] = [
     id: "item-ops-outline",
     ticketId: "OPERATIONS-1",
     projectId: "project-ops-handbook",
+    moduleId: "module-project-ops-handbook-operations",
+    parentId: null,
     title: "Draft handbook outline",
-    status: "Todo",
-    priority: "Medium",
+    status: "TODO",
+    priority: "MEDIUM",
+    labelIds: ["Design", "API-Integration"],
     labels: ["Design", "API-Integration"],
     assigneeIds: ["user-member-demo"],
     startDate: "2026-03-03",
@@ -102,3 +138,86 @@ export const demoCommentsSeed: Comment[] = [
     createdAt: seededAt,
   },
 ];
+
+type LegacyItemWithModule = ProjectItem & {
+  module?: string;
+};
+
+type MigrateLegacyItemsInput = {
+  items: unknown[];
+  projects: Project[];
+  existingModules?: Module[];
+};
+
+type MigrateLegacyItemsResult = {
+  items: ProjectItem[];
+  modules: Module[];
+};
+
+function normalizeProjectItem(raw: LegacyItemWithModule): ProjectItem {
+  return {
+    ...raw,
+    moduleId: raw.moduleId ?? null,
+    parentId: raw.parentId ?? null,
+    status: normalizeItemStatus(raw.status),
+    priority: normalizeItemPriority(raw.priority),
+    labelIds: (raw.labelIds ?? raw.labels ?? []).map((label) => String(label)),
+  };
+}
+
+export function migrateLegacyItemsToModules({
+  items,
+  projects,
+  existingModules = [],
+}: MigrateLegacyItemsInput): MigrateLegacyItemsResult {
+  const modulesByKey = new Map<string, Module>();
+
+  for (const moduleEntry of existingModules) {
+    modulesByKey.set(`${moduleEntry.projectId}:${moduleEntry.name.toLowerCase()}`, moduleEntry);
+  }
+
+  for (const moduleEntry of buildModulesFromProjects(projects)) {
+    const key = `${moduleEntry.projectId}:${moduleEntry.name.toLowerCase()}`;
+    if (!modulesByKey.has(key)) {
+      modulesByKey.set(key, moduleEntry);
+    }
+  }
+
+  const normalizedItems = items
+    .filter((item): item is LegacyItemWithModule => typeof item === "object" && item !== null)
+    .map((item) => {
+      const projectId = typeof item.projectId === "string" ? item.projectId : "";
+      const legacyModuleName = typeof item.module === "string" ? item.module.trim() : "";
+      let moduleId = typeof item.moduleId === "string" ? item.moduleId : null;
+
+      if (!moduleId && projectId && legacyModuleName) {
+        const key = `${projectId}:${legacyModuleName.toLowerCase()}`;
+        let moduleEntry = modulesByKey.get(key);
+
+        if (!moduleEntry) {
+          moduleEntry = {
+            id: `module-${projectId}-${slugifyModuleName(legacyModuleName)}`,
+            projectId,
+            name: legacyModuleName,
+            createdAt: item.createdAt ?? new Date().toISOString(),
+          };
+          modulesByKey.set(key, moduleEntry);
+        }
+
+        moduleId = moduleEntry.id;
+      }
+
+      const withoutLegacyModule = { ...item };
+      delete withoutLegacyModule.module;
+
+      return normalizeProjectItem({
+        ...withoutLegacyModule,
+        moduleId,
+      });
+    });
+
+  return {
+    items: normalizedItems,
+    modules: Array.from(modulesByKey.values()),
+  };
+}

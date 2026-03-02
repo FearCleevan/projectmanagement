@@ -34,6 +34,16 @@ export type User = {
   createdAt: string;
 };
 
+export type Module = {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string;
+  startDate?: string;
+  endDate?: string;
+  createdAt: string;
+};
+
 export type Project = {
   id: string;
   projectId: string;
@@ -49,18 +59,39 @@ export type Project = {
   updatedAt: string;
 };
 
-export const ITEM_STATUSES = [
-  "Backlog",
-  "Todo",
-  "Inprogress",
-  "In Review",
-  "Back to Dev",
-  "Back to Design",
-  "Done",
-  "Cancelled",
-] as const;
-export type ItemStatus = (typeof ITEM_STATUSES)[number];
-export type ItemPriority = "Low" | "Medium" | "High" | "Urgent";
+export type CanonicalItemStatus =
+  | "BACKLOG"
+  | "TODO"
+  | "IN_PROGRESS"
+  | "DONE"
+  | "BACK_TO_DEV"
+  | "BACK_TO_DESIGN";
+
+export const ITEM_STATUSES: ItemStatus[] = [
+  "BACKLOG",
+  "TODO",
+  "IN_PROGRESS",
+  "DONE",
+  "BACK_TO_DEV",
+  "BACK_TO_DESIGN",
+];
+
+// Transitional compatibility for previously persisted values.
+export type LegacyItemStatus =
+  | "Backlog"
+  | "Todo"
+  | "Inprogress"
+  | "In Review"
+  | "Back to Dev"
+  | "Back to Design"
+  | "Done"
+  | "Cancelled";
+
+export type ItemStatus = CanonicalItemStatus | LegacyItemStatus;
+
+export type CanonicalItemPriority = "LOW" | "MEDIUM" | "HIGH";
+export type LegacyItemPriority = "Low" | "Medium" | "High" | "Urgent";
+export type ItemPriority = CanonicalItemPriority | LegacyItemPriority;
 export const ITEM_LABELS = [
   "UI/UX",
   "Design",
@@ -75,23 +106,29 @@ export const ITEM_LABELS = [
 ] as const;
 export type ItemLabel = (typeof ITEM_LABELS)[number];
 
-export type ProjectItem = {
+export type Item = {
   id: string;
-  ticketId: string;
   projectId: string;
+  moduleId?: string | null;
+  parentId?: string | null;
+  ticketId: string;
   title: string;
   description?: string;
   status: ItemStatus;
   priority: ItemPriority;
-  labels: ItemLabel[];
   assigneeIds: string[];
+  labelIds?: string[];
   startDate?: string;
   dueDate?: string;
-  createdBy: string;
   archived?: boolean;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
+  createdBy: string;
+  // Transitional compatibility fields for existing UI/state usage.
+  labels?: ItemLabel[];
 };
+
+export type ProjectItem = Item;
 
 export type Comment = {
   id: string;
@@ -128,3 +165,47 @@ export type ActivityLog = {
   entityId: string;
   createdAt: string;
 };
+
+export function normalizeItemStatus(value: string | null | undefined): CanonicalItemStatus {
+  switch (value) {
+    case "BACKLOG":
+    case "Backlog":
+      return "BACKLOG";
+    case "TODO":
+    case "Todo":
+      return "TODO";
+    case "IN_PROGRESS":
+    case "Inprogress":
+    case "In Review":
+      return "IN_PROGRESS";
+    case "DONE":
+    case "Done":
+    case "Cancelled":
+      return "DONE";
+    case "BACK_TO_DEV":
+    case "Back to Dev":
+      return "BACK_TO_DEV";
+    case "BACK_TO_DESIGN":
+    case "Back to Design":
+      return "BACK_TO_DESIGN";
+    default:
+      return "BACKLOG";
+  }
+}
+
+export function normalizeItemPriority(value: string | null | undefined): CanonicalItemPriority {
+  switch (value) {
+    case "LOW":
+    case "Low":
+      return "LOW";
+    case "MEDIUM":
+    case "Medium":
+      return "MEDIUM";
+    case "HIGH":
+    case "High":
+    case "Urgent":
+      return "HIGH";
+    default:
+      return "MEDIUM";
+  }
+}
