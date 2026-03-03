@@ -202,13 +202,13 @@ export function CreateItemDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="w-[95vw] max-w-[1800px]">
         <DialogHeader>
           <DialogTitle>New Item</DialogTitle>
           <DialogDescription>Create a new item for this project.</DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4">
+        <div className="grid max-h-[72vh] gap-5 overflow-y-auto pr-1">
           <div className="space-y-2">
             <Label htmlFor="new-item-title">Title</Label>
             <Input
@@ -219,7 +219,7 @@ export function CreateItemDialog({
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
             <div className="space-y-2">
               <Label>Status</Label>
               <Select value={status} onValueChange={(value) => setStatus(value as ItemStatus)}>
@@ -251,9 +251,6 @@ export function CreateItemDialog({
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Module</Label>
               <Select
@@ -300,7 +297,7 @@ export function CreateItemDialog({
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
             <div className="space-y-2">
               <Label>Assignees</Label>
               <Popover open={assigneePickerOpen} onOpenChange={setAssigneePickerOpen}>
@@ -394,11 +391,9 @@ export function CreateItemDialog({
                 </div>
               ) : null}
             </div>
-          </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="new-item-start">Start Date</Label>
+              <Label>Start Date</Label>
               <Input
                 id="new-item-start"
                 type="date"
@@ -406,8 +401,9 @@ export function CreateItemDialog({
                 onChange={(event) => setStartDate(event.target.value)}
               />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="new-item-due">Due Date</Label>
+              <Label>Due Date</Label>
               <Input
                 id="new-item-due"
                 type="date"

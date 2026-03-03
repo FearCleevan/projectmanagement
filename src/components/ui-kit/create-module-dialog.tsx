@@ -71,7 +71,7 @@ export function CreateModuleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="w-[95vw] max-w-[1800px]">
         <DialogHeader>
           <DialogTitle>Create Module</DialogTitle>
           <DialogDescription>Create a module to organize project work items.</DialogDescription>
