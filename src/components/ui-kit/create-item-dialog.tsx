@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Check, ChevronDown, Tag, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -14,7 +15,15 @@ import {
   type User,
 } from "@/types/domain";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -32,6 +42,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RichTextEditor } from "@/components/ui-kit/rich-text-editor";
+import { cn } from "@/lib/utils";
 
 const ITEM_PRIORITIES: ItemPriority[] = ["Low", "Medium", "High", "Urgent"];
 
@@ -67,6 +79,9 @@ export function CreateItemDialog({
   const [assigneeIds, setAssigneeIds] = React.useState<string[]>([]);
   const [parentId, setParentId] = React.useState<string>("none");
   const [moduleId, setModuleId] = React.useState<string>("none");
+  const [description, setDescription] = React.useState("");
+  const [assigneePickerOpen, setAssigneePickerOpen] = React.useState(false);
+  const [labelPickerOpen, setLabelPickerOpen] = React.useState(false);
   const [startDate, setStartDate] = React.useState("");
   const [dueDate, setDueDate] = React.useState("");
 
@@ -94,6 +109,9 @@ export function CreateItemDialog({
     setAssigneeIds([]);
     setParentId("none");
     setModuleId("none");
+    setDescription("");
+    setAssigneePickerOpen(false);
+    setLabelPickerOpen(false);
     setStartDate("");
     setDueDate("");
   }, [open]);
@@ -159,6 +177,7 @@ export function CreateItemDialog({
       ticketId: generateNextTicketId(),
       projectId,
       title: title.trim(),
+      description: toPlainText(description).trim() ? description : undefined,
       moduleId: moduleId === "none" ? null : moduleId,
       parentId: parentId === "none" ? null : parentId,
       status,
@@ -175,6 +194,11 @@ export function CreateItemDialog({
 
     onOpenChange(false);
   };
+
+  const selectedAssignees = React.useMemo(
+    () => users.filter((user) => assigneeIds.includes(user.id)),
+    [assigneeIds, users]
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -268,32 +292,107 @@ export function CreateItemDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Assignees</Label>
-            <div className="max-h-36 space-y-2 overflow-auto rounded-md border p-2">
-              {users.map((user) => (
-                <label key={user.id} className="flex cursor-pointer items-center justify-between rounded px-2 py-1 text-sm hover:bg-muted/50">
-                  <span>{user.name}</span>
-                  <Checkbox
-                    checked={assigneeIds.includes(user.id)}
-                    onCheckedChange={(checked) => toggleAssignee(user.id, checked === true)}
-                  />
-                </label>
-              ))}
-            </div>
+            <Label htmlFor="new-item-description">Description</Label>
+            <RichTextEditor
+              value={description}
+              onChange={setDescription}
+              placeholder="Add a description... You can paste formatted text and images."
+            />
           </div>
 
-          <div className="space-y-2">
-            <Label>Labels</Label>
-            <div className="grid gap-2 rounded-md border p-2 sm:grid-cols-2">
-              {ITEM_LABELS.map((label) => (
-                <label key={label} className="flex cursor-pointer items-center justify-between rounded px-2 py-1 text-sm hover:bg-muted/50">
-                  <span>{label}</span>
-                  <Checkbox
-                    checked={labels.includes(label)}
-                    onCheckedChange={(checked) => toggleLabel(label, checked === true)}
-                  />
-                </label>
-              ))}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Assignees</Label>
+              <Popover open={assigneePickerOpen} onOpenChange={setAssigneePickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="outline" className="w-full justify-between font-normal">
+                    <span className="inline-flex items-center gap-2 truncate">
+                      <Users className="size-4 text-muted-foreground" />
+                      {assigneeIds.length === 0 ? "Select assignees" : `${assigneeIds.length} selected`}
+                    </span>
+                    <ChevronDown className="size-4 text-muted-foreground" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-[320px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search assignees..." />
+                    <CommandList>
+                      <CommandEmpty>No users found.</CommandEmpty>
+                      <CommandGroup>
+                        {users.map((user) => {
+                          const isSelected = assigneeIds.includes(user.id);
+                          return (
+                            <CommandItem
+                              key={user.id}
+                              value={`${user.name} ${user.email}`}
+                              onSelect={() => toggleAssignee(user.id, !isSelected)}
+                            >
+                              <Check className={cn("size-4", isSelected ? "opacity-100" : "opacity-0")} />
+                              <span className="truncate">{user.name}</span>
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {selectedAssignees.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {selectedAssignees.map((user) => (
+                    <Badge key={user.id} variant="secondary" className="font-normal">
+                      {user.name}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Labels</Label>
+              <Popover open={labelPickerOpen} onOpenChange={setLabelPickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="outline" className="w-full justify-between font-normal">
+                    <span className="inline-flex items-center gap-2 truncate">
+                      <Tag className="size-4 text-muted-foreground" />
+                      {labels.length === 0 ? "Select labels" : `${labels.length} selected`}
+                    </span>
+                    <ChevronDown className="size-4 text-muted-foreground" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-[320px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search labels..." />
+                    <CommandList>
+                      <CommandEmpty>No labels found.</CommandEmpty>
+                      <CommandGroup>
+                        {ITEM_LABELS.map((label) => {
+                          const isSelected = labels.includes(label);
+                          return (
+                            <CommandItem
+                              key={label}
+                              value={label}
+                              onSelect={() => toggleLabel(label, !isSelected)}
+                            >
+                              <Check className={cn("size-4", isSelected ? "opacity-100" : "opacity-0")} />
+                              <span>{label}</span>
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {labels.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {labels.map((label) => (
+                    <Badge key={label} variant="outline" className="font-normal">
+                      {label}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -325,4 +424,12 @@ export function CreateItemDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function toPlainText(value: string) {
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }

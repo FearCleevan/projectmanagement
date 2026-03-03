@@ -497,23 +497,23 @@ export default function ProjectDetailPage() {
               onAction={canCreateItems ? handleNewItem : undefined}
             />
           ) : (
-            <Card className="border shadow-sm">
+            <Card className="overflow-hidden border shadow-sm">
               <CardContent className="p-0">
                 <Table>
                   <TableHeader>
-                    <TableRow>
+                    <TableRow className="bg-muted/30 hover:bg-muted/30">
                       <TableHead className="w-10" />
-                      <TableHead>Work Items</TableHead>
-                      <TableHead>Progress</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Priority</TableHead>
-                      <TableHead>Assignees</TableHead>
-                      <TableHead>Labels</TableHead>
-                      <TableHead>Module</TableHead>
-                      <TableHead>Start Date</TableHead>
-                      <TableHead>Due Date</TableHead>
-                      <TableHead>Created On</TableHead>
-                      <TableHead>Created By</TableHead>
+                      <TableHead className="min-w-[260px]">Work Items</TableHead>
+                      <TableHead className="w-[110px]">Progress</TableHead>
+                      <TableHead className="w-[170px]">Status</TableHead>
+                      <TableHead className="w-[110px]">Priority</TableHead>
+                      <TableHead className="w-[170px]">Assignees</TableHead>
+                      <TableHead className="min-w-[190px]">Labels</TableHead>
+                      <TableHead className="w-[140px]">Module</TableHead>
+                      <TableHead className="w-[120px]">Start Date</TableHead>
+                      <TableHead className="w-[120px]">Due Date</TableHead>
+                      <TableHead className="w-[120px]">Created On</TableHead>
+                      <TableHead className="w-[110px]">Created By</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -767,6 +767,14 @@ function formatDateRange(startDate?: string, endDate?: string) {
   return `${start} - ${end}`;
 }
 
+function truncateWithEllipsis(value: string, maxLength: number) {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength).trimEnd()}...`;
+}
+
 function toPlainText(value: string) {
   return value
     .replace(/<[^>]*>/g, " ")
@@ -820,13 +828,16 @@ function ItemRow({
 
   return (
     <>
-      <TableRow className="cursor-pointer" onClick={() => onOpenItem(item.id)}>
-        <TableCell>
+      <TableRow
+        className="group cursor-pointer border-b border-border/60 transition-colors hover:bg-muted/30"
+        onClick={() => onOpenItem(item.id)}
+      >
+        <TableCell className="align-top">
           {hasChildren ? (
             <Button
               variant="ghost"
               size="icon"
-              className="size-7"
+              className="mt-1 size-7"
               onClick={(event) => {
                 event.stopPropagation();
                 onToggleExpand(item.id);
@@ -836,26 +847,28 @@ function ItemRow({
             </Button>
           ) : null}
         </TableCell>
-        <TableCell>
-          <div className="space-y-1" style={{ paddingLeft: `${level * 20}px` }}>
-            <p className="text-xs font-medium text-muted-foreground">
+        <TableCell className="align-top">
+          <div className="space-y-1.5 py-1" style={{ paddingLeft: `${level * 20}px` }}>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               {item.ticketId || `${projectCode}-${projectItems.findIndex((candidate) => candidate.id === item.id) + 1}`}
             </p>
-            <p className="font-medium">{item.title}</p>
+            <p className="line-clamp-1 font-medium leading-tight">
+              {truncateWithEllipsis(item.title, 65)}
+            </p>
           </div>
         </TableCell>
-        <TableCell>
-          <div className="space-y-1">
-            <div className="h-1.5 w-20 rounded bg-muted">
-              <div className="h-1.5 rounded bg-primary" style={{ width: `${progress}%` }} />
+        <TableCell className="align-top">
+          <div className="space-y-1 py-1">
+            <div className="h-1.5 w-24 rounded-full bg-muted">
+              <div className="h-1.5 rounded-full bg-primary" style={{ width: `${progress}%` }} />
             </div>
             <p className="text-[11px] text-muted-foreground">{progress}%</p>
           </div>
         </TableCell>
-        <TableCell>
+        <TableCell className="align-top">
           <div onClick={(event) => event.stopPropagation()}>
             <Select value={item.status} onValueChange={(value) => onInlineStatusChange(item, value as ItemStatus)}>
-              <SelectTrigger className="h-8 w-[150px]">
+              <SelectTrigger className="h-8 w-[160px] border-border/70 bg-background/70">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -868,12 +881,17 @@ function ItemRow({
             </Select>
           </div>
         </TableCell>
-        <TableCell>{item.priority}</TableCell>
-        <TableCell>
+        <TableCell className="align-top">
+          <Badge variant="outline" className="mt-1 rounded-sm bg-background/70 text-[11px]">
+            {item.priority}
+          </Badge>
+        </TableCell>
+        <TableCell className="align-top">
           {item.assigneeIds.length === 0 ? (
-            <span className="text-xs text-muted-foreground">Unassigned</span>
+            <span className="mt-1 inline-flex text-xs text-muted-foreground">Unassigned</span>
           ) : (
-            <AvatarGroup>
+            <div className="mt-1">
+              <AvatarGroup>
               {item.assigneeIds.slice(0, 3).map((assigneeId) => {
                 const assignee = usersById.get(assigneeId);
                 return (
@@ -891,16 +909,21 @@ function ItemRow({
               {item.assigneeIds.length > 3 ? (
                 <AvatarGroupCount className="size-6 text-xs">+{item.assigneeIds.length - 3}</AvatarGroupCount>
               ) : null}
-            </AvatarGroup>
+              </AvatarGroup>
+            </div>
           )}
         </TableCell>
-        <TableCell>
-          <div className="flex flex-wrap items-center gap-1">
+        <TableCell className="align-top">
+          <div className="mt-1 flex flex-wrap items-center gap-1">
             {(item.labels ?? []).length === 0 ? (
               <span className="text-xs text-muted-foreground">No Labels</span>
             ) : (
               (item.labels ?? []).map((label) => (
-                <Badge key={label} variant="outline" className={LABEL_COLORS[label as ItemLabel]}>
+                <Badge
+                  key={label}
+                  variant="outline"
+                  className={`rounded-sm border-border/60 text-[11px] ${LABEL_COLORS[label as ItemLabel]}`}
+                >
                   <Tag className="mr-1 size-3" />
                   {label}
                 </Badge>
@@ -908,14 +931,18 @@ function ItemRow({
             )}
           </div>
         </TableCell>
-        <TableCell>{item.moduleId ? moduleById.get(item.moduleId)?.name ?? "--" : "--"}</TableCell>
-        <TableCell>{formatDate(item.startDate)}</TableCell>
-        <TableCell>{formatDate(item.dueDate)}</TableCell>
-        <TableCell>{formatDate(item.createdAt)}</TableCell>
-        <TableCell>
+        <TableCell className="align-top">
+          <Badge variant="secondary" className="mt-1 rounded-sm text-[11px] font-normal">
+            {item.moduleId ? moduleById.get(item.moduleId)?.name ?? "--" : "--"}
+          </Badge>
+        </TableCell>
+        <TableCell className="align-top text-xs text-muted-foreground">{formatDate(item.startDate)}</TableCell>
+        <TableCell className="align-top text-xs text-muted-foreground">{formatDate(item.dueDate)}</TableCell>
+        <TableCell className="align-top text-xs text-muted-foreground">{formatDate(item.createdAt)}</TableCell>
+        <TableCell className="align-top">
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs">
+              <div className="inline-flex items-center gap-2 rounded-sm border border-border/70 bg-background/70 px-2 py-1 text-xs">
                 <User className="size-3.5 text-muted-foreground" />
                 {getInitials(usersById.get(item.createdBy)?.name)}
               </div>
