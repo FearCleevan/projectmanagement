@@ -43,6 +43,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RichTextEditor } from "@/components/ui-kit/rich-text-editor";
+import { DateRangePicker } from "@/components/ui-kit/date-range-picker";
 import { cn } from "@/lib/utils";
 
 const ITEM_PRIORITIES: ItemPriority[] = ["Low", "Medium", "High", "Urgent"];
@@ -392,23 +393,15 @@ export function CreateItemDialog({
               ) : null}
             </div>
 
-            <div className="space-y-2">
-              <Label>Start Date</Label>
-              <Input
-                id="new-item-start"
-                type="date"
-                value={startDate}
-                onChange={(event) => setStartDate(event.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Due Date</Label>
-              <Input
-                id="new-item-due"
-                type="date"
-                value={dueDate}
-                onChange={(event) => setDueDate(event.target.value)}
+            <div className="space-y-2 md:col-span-2 xl:col-span-2">
+              <Label>Schedule</Label>
+              <DateRangePicker
+                startDate={startDate || undefined}
+                dueDate={dueDate || undefined}
+                onChange={(next) => {
+                  setStartDate(next.startDate ?? "");
+                  setDueDate(next.dueDate ?? "");
+                }}
               />
             </div>
           </div>

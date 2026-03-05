@@ -4,6 +4,7 @@ import Link from "next/link";
 import * as React from "react";
 import { useParams } from "next/navigation";
 import {
+  Check,
   CalendarDays,
   ChevronDown,
   ChevronRight,
@@ -16,6 +17,7 @@ import {
   Table2,
   Tag,
   User,
+  Users,
 } from "lucide-react";
 import {
   DndContext,
@@ -34,6 +36,7 @@ import { CreateModuleDialog } from "@/components/ui-kit/create-module-dialog";
 import { CreateItemDialog } from "@/components/ui-kit/create-item-dialog";
 import { EmptyState } from "@/components/ui-kit/empty-state";
 import { ItemSheet } from "@/components/ui-kit/item-sheet";
+import { DateRangePicker } from "@/components/ui-kit/date-range-picker";
 import {
   Avatar,
   AvatarFallback,
@@ -44,7 +47,16 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -52,14 +64,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -288,6 +292,29 @@ export default function ProjectDetailPage() {
     toast.success("Item status updated.");
   };
 
+  const handleInlineScheduleChange = (
+    item: ProjectItem,
+    nextStartDate?: string,
+    nextDueDate?: string
+  ) => {
+    updateItem({
+      ...item,
+      startDate: nextStartDate,
+      dueDate: nextDueDate,
+      updatedAt: new Date().toISOString(),
+    });
+    toast.success("Schedule updated.");
+  };
+
+  const handleInlineAssigneeChange = (item: ProjectItem, nextAssigneeIds: string[]) => {
+    updateItem({
+      ...item,
+      assigneeIds: nextAssigneeIds,
+      updatedAt: new Date().toISOString(),
+    });
+    toast.success("Assignees updated.");
+  };
+
   if (!hydrated) {
     return (
       <div className="space-y-6">
@@ -475,7 +502,7 @@ export default function ProjectDetailPage() {
         <TabsList>
           <TabsTrigger value="table">
             <Table2 className="size-4" />
-            Table
+            Backlog
           </TabsTrigger>
           <TabsTrigger value="list">
             <List className="size-4" />
@@ -491,53 +518,45 @@ export default function ProjectDetailPage() {
           {filteredRoots.length === 0 ? (
             <EmptyState
               icon={ListTodo}
-              title="No items in table view"
+              title="No items in backlog view"
               description="Try adjusting filters or create your first project item."
               actionLabel={canCreateItems ? "New Item" : undefined}
               onAction={canCreateItems ? handleNewItem : undefined}
             />
           ) : (
-            <Card className="overflow-hidden border shadow-sm">
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/30 hover:bg-muted/30">
-                      <TableHead className="w-10" />
-                      <TableHead className="min-w-[260px]">Work Items</TableHead>
-                      <TableHead className="w-[110px]">Progress</TableHead>
-                      <TableHead className="w-[170px]">Status</TableHead>
-                      <TableHead className="w-[110px]">Priority</TableHead>
-                      <TableHead className="w-[170px]">Assignees</TableHead>
-                      <TableHead className="min-w-[190px]">Labels</TableHead>
-                      <TableHead className="w-[140px]">Module</TableHead>
-                      <TableHead className="w-[120px]">Start Date</TableHead>
-                      <TableHead className="w-[120px]">Due Date</TableHead>
-                      <TableHead className="w-[120px]">Created On</TableHead>
-                      <TableHead className="w-[110px]">Created By</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredRoots.map((item) => (
-                      <ItemRow
-                        key={item.id}
-                        item={item}
-                        level={0}
-                        projectCode={projectCode}
-                        projectItems={projectItems}
-                        moduleById={moduleById}
-                        usersById={usersById}
-                        childrenByParentId={childrenByParentId}
-                        expanded={expanded}
-                        onToggleExpand={(itemId) =>
-                          setExpanded((current) => ({ ...current, [itemId]: !current[itemId] }))
-                        }
-                        onOpenItem={handleOpenItem}
-                        onInlineStatusChange={handleInlineStatusChange}
-                        calculateItemProgress={calculateItemProgress}
-                      />
-                    ))}
-                  </TableBody>
-                </Table>
+            <Card className="overflow-hidden border-border/60 bg-[#0f1218]/90 shadow-sm">
+              <CardContent className="space-y-2 p-3">
+                <div className="flex items-center justify-between rounded-lg border border-white/10 bg-background/40 px-3 py-2">
+                  <div className="inline-flex items-center gap-2 text-sm font-medium">
+                    <Table2 className="size-4 text-muted-foreground" />
+                    Backlog
+                  </div>
+                  <Badge variant="outline" className="rounded-full">
+                    {filteredItems.length} issues
+                  </Badge>
+                </div>
+                {filteredRoots.map((item) => (
+                  <ItemRow
+                    key={item.id}
+                    item={item}
+                    level={0}
+                    projectCode={projectCode}
+                    projectItems={projectItems}
+                    users={users}
+                    moduleById={moduleById}
+                    usersById={usersById}
+                    childrenByParentId={childrenByParentId}
+                    expanded={expanded}
+                    onToggleExpand={(itemId) =>
+                      setExpanded((current) => ({ ...current, [itemId]: !current[itemId] }))
+                    }
+                    onOpenItem={handleOpenItem}
+                    onInlineStatusChange={handleInlineStatusChange}
+                    onInlineScheduleChange={handleInlineScheduleChange}
+                    onInlineAssigneeChange={handleInlineAssigneeChange}
+                    calculateItemProgress={calculateItemProgress}
+                  />
+                ))}
               </CardContent>
             </Card>
           )}
@@ -757,6 +776,23 @@ function formatDate(value?: string) {
   return date.toLocaleDateString();
 }
 
+function formatDateCompact(value?: string) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Invalid";
+  }
+
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 function formatDateRange(startDate?: string, endDate?: string) {
   if (!startDate && !endDate) {
     return "No dates";
@@ -799,6 +835,7 @@ function ItemRow({
   level,
   projectCode,
   projectItems,
+  users,
   moduleById,
   usersById,
   childrenByParentId,
@@ -806,12 +843,15 @@ function ItemRow({
   onToggleExpand,
   onOpenItem,
   onInlineStatusChange,
+  onInlineScheduleChange,
+  onInlineAssigneeChange,
   calculateItemProgress,
 }: {
   item: ProjectItem;
   level: number;
   projectCode: string;
   projectItems: ProjectItem[];
+  users: DomainUser[];
   moduleById: Map<string, Module>;
   usersById: Map<string, DomainUser>;
   childrenByParentId: Map<string, ProjectItem[]>;
@@ -819,56 +859,61 @@ function ItemRow({
   onToggleExpand: (itemId: string) => void;
   onOpenItem: (itemId: string) => void;
   onInlineStatusChange: (item: ProjectItem, nextStatus: ItemStatus) => void;
+  onInlineScheduleChange: (item: ProjectItem, nextStartDate?: string, nextDueDate?: string) => void;
+  onInlineAssigneeChange: (item: ProjectItem, nextAssigneeIds: string[]) => void;
   calculateItemProgress: (itemId: string) => number;
 }) {
   const children = childrenByParentId.get(item.id) ?? [];
   const hasChildren = children.length > 0;
   const isExpanded = Boolean(expanded[item.id]);
   const progress = calculateItemProgress(item.id);
+  const ticketDisplay =
+    item.ticketId || `${projectCode}-${projectItems.findIndex((candidate) => candidate.id === item.id) + 1}`;
 
   return (
     <>
-      <TableRow
-        className="group cursor-pointer border-b border-border/60 transition-colors hover:bg-muted/30"
+      <div
+        className="group rounded-xl border border-white/5 bg-background/30 px-3 py-2 transition hover:border-white/10 hover:bg-background/50"
+        style={{ marginLeft: `${level * 16}px` }}
         onClick={() => onOpenItem(item.id)}
       >
-        <TableCell className="align-top">
-          {hasChildren ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="mt-1 size-7"
-              onClick={(event) => {
-                event.stopPropagation();
-                onToggleExpand(item.id);
-              }}
-            >
-              {isExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-            </Button>
-          ) : null}
-        </TableCell>
-        <TableCell className="align-top">
-          <div className="space-y-1.5 py-1" style={{ paddingLeft: `${level * 20}px` }}>
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              {item.ticketId || `${projectCode}-${projectItems.findIndex((candidate) => candidate.id === item.id) + 1}`}
-            </p>
-            <p className="line-clamp-1 font-medium leading-tight">
-              {truncateWithEllipsis(item.title, 65)}
-            </p>
-          </div>
-        </TableCell>
-        <TableCell className="align-top">
-          <div className="space-y-1 py-1">
-            <div className="h-1.5 w-24 rounded-full bg-muted">
-              <div className="h-1.5 rounded-full bg-primary" style={{ width: `${progress}%` }} />
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex min-w-0 items-start gap-2">
+            <div className="pt-0.5">
+              {hasChildren ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 rounded-md"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onToggleExpand(item.id);
+                  }}
+                >
+                  {isExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                </Button>
+              ) : (
+                <span className="inline-flex size-7 items-center justify-center text-muted-foreground/40">
+                  <ChevronRight className="size-3.5" />
+                </span>
+              )}
             </div>
-            <p className="text-[11px] text-muted-foreground">{progress}%</p>
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium tracking-wide text-muted-foreground">{ticketDisplay}</p>
+              <p className="truncate text-sm font-medium leading-6">{truncateWithEllipsis(item.title, 90)}</p>
+            </div>
           </div>
-        </TableCell>
-        <TableCell className="align-top">
-          <div onClick={(event) => event.stopPropagation()}>
+
+          <div className="flex flex-wrap items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
+            <div className="inline-flex items-center gap-2 rounded-md border border-border/60 bg-background/40 px-2 py-1">
+              <div className="h-1 w-16 overflow-hidden rounded-full bg-muted">
+                <div className="h-full rounded-full bg-primary/80" style={{ width: `${progress}%` }} />
+              </div>
+              <span className="text-[11px] text-muted-foreground">{progress}%</span>
+            </div>
+
             <Select value={item.status} onValueChange={(value) => onInlineStatusChange(item, value as ItemStatus)}>
-              <SelectTrigger className="h-8 w-[160px] border-border/70 bg-background/70">
+              <SelectTrigger className="h-8 w-[126px] rounded-md border-border/60 bg-background/40 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -879,78 +924,60 @@ function ItemRow({
                 ))}
               </SelectContent>
             </Select>
+
+            <Badge variant="outline" className="h-8 rounded-full border-border/60 bg-background/40 px-3 text-xs">
+              {item.priority}
+            </Badge>
+
+            <InlineAssigneePicker
+              users={users}
+              usersById={usersById}
+              assigneeIds={item.assigneeIds}
+              onChange={(nextAssigneeIds) => onInlineAssigneeChange(item, nextAssigneeIds)}
+            />
+
+            {(item.labels ?? []).slice(0, 2).map((label) => (
+              <Badge
+                key={label}
+                variant="outline"
+                className={`h-8 rounded-full border-border/60 bg-background/40 px-3 text-xs ${LABEL_COLORS[label as ItemLabel]}`}
+              >
+                <Tag className="mr-1 size-3" />
+                {label}
+              </Badge>
+            ))}
+            {item.labels && item.labels.length > 2 ? (
+              <Badge variant="outline" className="h-8 rounded-full border-border/60 bg-background/40 px-3 text-xs">
+                +{item.labels.length - 2}
+              </Badge>
+            ) : null}
+
+            <Badge variant="outline" className="h-8 rounded-full border-border/60 bg-background/40 px-3 text-xs">
+              {item.moduleId ? moduleById.get(item.moduleId)?.name ?? "--" : "--"}
+            </Badge>
+
+            <DateRangePicker
+              startDate={item.startDate}
+              dueDate={item.dueDate}
+              onChange={(next) => onInlineScheduleChange(item, next.startDate, next.dueDate)}
+            />
+
+            <Badge variant="outline" className="h-8 rounded-full border-border/60 bg-background/40 px-3 text-xs text-muted-foreground">
+              {formatDateCompact(item.createdAt) ?? "Created"}
+            </Badge>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Avatar size="sm">
+                  <AvatarImage src={usersById.get(item.createdBy)?.avatarUrl} />
+                  <AvatarFallback>{getInitials(usersById.get(item.createdBy)?.name)}</AvatarFallback>
+                </Avatar>
+              </TooltipTrigger>
+              <TooltipContent>{usersById.get(item.createdBy)?.name ?? "Unknown User"}</TooltipContent>
+            </Tooltip>
           </div>
-        </TableCell>
-        <TableCell className="align-top">
-          <Badge variant="outline" className="mt-1 rounded-sm bg-background/70 text-[11px]">
-            {item.priority}
-          </Badge>
-        </TableCell>
-        <TableCell className="align-top">
-          {item.assigneeIds.length === 0 ? (
-            <span className="mt-1 inline-flex text-xs text-muted-foreground">Unassigned</span>
-          ) : (
-            <div className="mt-1">
-              <AvatarGroup>
-              {item.assigneeIds.slice(0, 3).map((assigneeId) => {
-                const assignee = usersById.get(assigneeId);
-                return (
-                  <Tooltip key={assigneeId}>
-                    <TooltipTrigger asChild>
-                      <Avatar size="sm">
-                        <AvatarImage src={assignee?.avatarUrl} />
-                        <AvatarFallback>{getInitials(assignee?.name)}</AvatarFallback>
-                      </Avatar>
-                    </TooltipTrigger>
-                    <TooltipContent>{assignee?.name ?? "Unknown User"}</TooltipContent>
-                  </Tooltip>
-                );
-              })}
-              {item.assigneeIds.length > 3 ? (
-                <AvatarGroupCount className="size-6 text-xs">+{item.assigneeIds.length - 3}</AvatarGroupCount>
-              ) : null}
-              </AvatarGroup>
-            </div>
-          )}
-        </TableCell>
-        <TableCell className="align-top">
-          <div className="mt-1 flex flex-wrap items-center gap-1">
-            {(item.labels ?? []).length === 0 ? (
-              <span className="text-xs text-muted-foreground">No Labels</span>
-            ) : (
-              (item.labels ?? []).map((label) => (
-                <Badge
-                  key={label}
-                  variant="outline"
-                  className={`rounded-sm border-border/60 text-[11px] ${LABEL_COLORS[label as ItemLabel]}`}
-                >
-                  <Tag className="mr-1 size-3" />
-                  {label}
-                </Badge>
-              ))
-            )}
-          </div>
-        </TableCell>
-        <TableCell className="align-top">
-          <Badge variant="secondary" className="mt-1 rounded-sm text-[11px] font-normal">
-            {item.moduleId ? moduleById.get(item.moduleId)?.name ?? "--" : "--"}
-          </Badge>
-        </TableCell>
-        <TableCell className="align-top text-xs text-muted-foreground">{formatDate(item.startDate)}</TableCell>
-        <TableCell className="align-top text-xs text-muted-foreground">{formatDate(item.dueDate)}</TableCell>
-        <TableCell className="align-top text-xs text-muted-foreground">{formatDate(item.createdAt)}</TableCell>
-        <TableCell className="align-top">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="inline-flex items-center gap-2 rounded-sm border border-border/70 bg-background/70 px-2 py-1 text-xs">
-                <User className="size-3.5 text-muted-foreground" />
-                {getInitials(usersById.get(item.createdBy)?.name)}
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>{usersById.get(item.createdBy)?.name ?? "Unknown User"}</TooltipContent>
-          </Tooltip>
-        </TableCell>
-      </TableRow>
+        </div>
+      </div>
       {isExpanded
         ? children.map((child) => (
             <ItemRow
@@ -959,6 +986,7 @@ function ItemRow({
               level={level + 1}
               projectCode={projectCode}
               projectItems={projectItems}
+              users={users}
               moduleById={moduleById}
               usersById={usersById}
               childrenByParentId={childrenByParentId}
@@ -966,11 +994,109 @@ function ItemRow({
               onToggleExpand={onToggleExpand}
               onOpenItem={onOpenItem}
               onInlineStatusChange={onInlineStatusChange}
+              onInlineScheduleChange={onInlineScheduleChange}
+              onInlineAssigneeChange={onInlineAssigneeChange}
               calculateItemProgress={calculateItemProgress}
             />
           ))
         : null}
     </>
+  );
+}
+
+function InlineAssigneePicker({
+  users,
+  usersById,
+  assigneeIds,
+  onChange,
+}: {
+  users: DomainUser[];
+  usersById: Map<string, DomainUser>;
+  assigneeIds: string[];
+  onChange: (nextAssigneeIds: string[]) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const selectedAssignees = React.useMemo(
+    () => assigneeIds.map((id) => usersById.get(id)).filter(Boolean) as DomainUser[],
+    [assigneeIds, usersById]
+  );
+
+  const toggleAssignee = (userId: string) => {
+    if (assigneeIds.includes(userId)) {
+      onChange(assigneeIds.filter((id) => id !== userId));
+      return;
+    }
+
+    onChange([...new Set([...assigneeIds, userId])]);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-8 rounded-full border-border/60 bg-background/40 px-2"
+          aria-label="Manage assignees"
+        >
+          {selectedAssignees.length === 0 ? (
+            <Users className="size-3.5 text-muted-foreground" />
+          ) : (
+            <AvatarGroup>
+              {selectedAssignees.slice(0, 2).map((assignee) => (
+                <Tooltip key={assignee.id}>
+                  <TooltipTrigger asChild>
+                    <Avatar size="sm">
+                      <AvatarImage src={assignee.avatarUrl} />
+                      <AvatarFallback>{getInitials(assignee.name)}</AvatarFallback>
+                    </Avatar>
+                  </TooltipTrigger>
+                  <TooltipContent>{assignee.name}</TooltipContent>
+                </Tooltip>
+              ))}
+              {selectedAssignees.length > 2 ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <AvatarGroupCount className="size-6 text-xs">
+                      +{selectedAssignees.length - 2}
+                    </AvatarGroupCount>
+                  </TooltipTrigger>
+                  <TooltipContent>{selectedAssignees.length} total</TooltipContent>
+                </Tooltip>
+              ) : null}
+            </AvatarGroup>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-[290px] p-0">
+        <Command>
+          <CommandInput placeholder="Search assignees..." />
+          <CommandList>
+            <CommandEmpty>No users found.</CommandEmpty>
+            <CommandGroup>
+              {users.map((user) => {
+                const isSelected = assigneeIds.includes(user.id);
+                return (
+                  <CommandItem
+                    key={user.id}
+                    value={`${user.name} ${user.email}`}
+                    onSelect={() => toggleAssignee(user.id)}
+                    className="flex items-center gap-2"
+                  >
+                    <Avatar size="sm">
+                      <AvatarImage src={user.avatarUrl} />
+                      <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+                    </Avatar>
+                    <span className="flex-1 truncate">{user.name}</span>
+                    <Check className={`size-4 ${isSelected ? "opacity-100" : "opacity-0"}`} />
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 

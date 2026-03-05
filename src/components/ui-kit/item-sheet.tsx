@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { MessageSquareText, MoreHorizontal, Save } from "lucide-react";
+import { Loader2, MessageSquareText, MoreHorizontal, Save } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -18,6 +18,7 @@ import {
   type User,
 } from "@/types/domain";
 import { ConfirmDialog } from "@/components/ui-kit/confirm-dialog";
+import { DateRangePicker } from "@/components/ui-kit/date-range-picker";
 import { RichTextEditor } from "@/components/ui-kit/rich-text-editor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -61,7 +62,7 @@ type ItemSheetProps = {
   currentUserId: string | null;
   onOpenChange: (open: boolean) => void;
   onCreateItem: (item: ProjectItem) => void;
-  onUpdate: (item: ProjectItem) => void;
+  onUpdate: (item: ProjectItem) => void | Promise<void>;
   onAddComment: (comment: Comment) => void;
   onArchiveItem: (itemId: string) => void;
   onDeleteItem: (itemId: string) => void;
@@ -90,6 +91,7 @@ export function ItemSheet({
   const [itemActionDialogOpen, setItemActionDialogOpen] = React.useState(false);
   const [pendingItemAction, setPendingItemAction] = React.useState<"archive" | "delete" | null>(null);
   const [subWorkTitle, setSubWorkTitle] = React.useState("");
+  const [isSaving, setIsSaving] = React.useState(false);
   const getChildItems = useAppStore((state) => state.getChildItems);
   const calculateItemProgress = useAppStore((state) => state.calculateItemProgress);
 
@@ -147,7 +149,7 @@ export function ItemSheet({
     updateDraft({ labels: (draft.labels ?? []).filter((value) => value !== label) });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!draft || !item) {
       return;
     }
@@ -159,23 +161,37 @@ export function ItemSheet({
 
     const now = new Date().toISOString();
 
-    if (isMember) {
-      onUpdate({
-        ...item,
-        status: draft.status,
-        updatedAt: now,
-      });
-      toast.success("Status updated.");
-      return;
-    }
+    try {
+      setIsSaving(true);
 
-    onUpdate({
-      ...draft,
-      title: draft.title.trim(),
-      description: toPlainText(draft.description ?? "").trim() ? draft.description : undefined,
-      updatedAt: now,
-    });
-    toast.success("Item updated.");
+      if (isMember) {
+        await Promise.resolve(
+          onUpdate({
+            ...item,
+            status: draft.status,
+            updatedAt: now,
+          })
+        );
+        toast.success("Status updated.");
+        onOpenChange(false);
+        return;
+      }
+
+      await Promise.resolve(
+        onUpdate({
+          ...draft,
+          title: draft.title.trim(),
+          description: toPlainText(draft.description ?? "").trim() ? draft.description : undefined,
+          updatedAt: now,
+        })
+      );
+      toast.success("Item updated.");
+      onOpenChange(false);
+    } catch {
+      toast.error("Failed to save changes.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleAddComment = () => {
@@ -271,7 +287,7 @@ export function ItemSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full overflow-hidden sm:max-w-2xl lg:max-w-3xl">
+      <SheetContent className="w-full overflow-hidden sm:max-w-[50vw]">
         <SheetHeader className="px-6 pt-6">
           <div className="flex items-start justify-between gap-3">
             <SheetTitle>Item Details</SheetTitle>
@@ -435,27 +451,19 @@ export function ItemSheet({
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="item-start">Start Date</Label>
-                  <Input
-                    id="item-start"
-                    type="date"
-                    value={draft.startDate ?? ""}
-                    disabled={!canEditFull}
-                    onChange={(event) => updateDraft({ startDate: event.target.value || undefined })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="item-due">Due Date</Label>
-                  <Input
-                    id="item-due"
-                    type="date"
-                    value={draft.dueDate ?? ""}
-                    disabled={!canEditFull}
-                    onChange={(event) => updateDraft({ dueDate: event.target.value || undefined })}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label>Schedule</Label>
+                <DateRangePicker
+                  startDate={draft.startDate}
+                  dueDate={draft.dueDate}
+                  disabled={!canEditFull}
+                  onChange={(next) =>
+                    updateDraft({
+                      startDate: next.startDate,
+                      dueDate: next.dueDate,
+                    })
+                  }
+                />
               </div>
 
               <Separator />
@@ -574,9 +582,9 @@ export function ItemSheet({
         )}
 
         <SheetFooter className="px-6 pb-6">
-          <Button onClick={handleSave} disabled={!draft}>
-            <Save className="mr-2 size-4" />
-            Save Changes
+          <Button onClick={handleSave} disabled={!draft || isSaving}>
+            {isSaving ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Save className="mr-2 size-4" />}
+            {isSaving ? "Saving..." : "Save Changes"}
           </Button>
         </SheetFooter>
       </SheetContent>
