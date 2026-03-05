@@ -524,9 +524,9 @@ export default function ProjectDetailPage() {
               onAction={canCreateItems ? handleNewItem : undefined}
             />
           ) : (
-            <Card className="overflow-hidden border-border/60 bg-[#0f1218]/90 shadow-sm">
+            <Card className="overflow-hidden border-border/60 bg-card/70 shadow-sm">
               <CardContent className="space-y-2 p-3">
-                <div className="flex items-center justify-between rounded-lg border border-white/10 bg-background/40 px-3 py-2">
+                <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
                   <div className="inline-flex items-center gap-2 text-sm font-medium">
                     <Table2 className="size-4 text-muted-foreground" />
                     Backlog
@@ -873,7 +873,7 @@ function ItemRow({
   return (
     <>
       <div
-        className="group rounded-xl border border-white/5 bg-background/30 px-3 py-2 transition hover:border-white/10 hover:bg-background/50"
+        className="group rounded-xl border border-border/50 bg-card/40 px-3 py-2 transition hover:border-border hover:bg-muted/30"
         style={{ marginLeft: `${level * 16}px` }}
         onClick={() => onOpenItem(item.id)}
       >
@@ -905,7 +905,7 @@ function ItemRow({
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
-            <div className="inline-flex items-center gap-2 rounded-md border border-border/60 bg-background/40 px-2 py-1">
+            <div className="inline-flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-2 py-1">
               <div className="h-1 w-16 overflow-hidden rounded-full bg-muted">
                 <div className="h-full rounded-full bg-primary/80" style={{ width: `${progress}%` }} />
               </div>
@@ -913,7 +913,7 @@ function ItemRow({
             </div>
 
             <Select value={item.status} onValueChange={(value) => onInlineStatusChange(item, value as ItemStatus)}>
-              <SelectTrigger className="h-8 w-[126px] rounded-md border-border/60 bg-background/40 text-xs">
+              <SelectTrigger className="h-8 w-[126px] rounded-md border-border/60 bg-muted/30 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -925,7 +925,7 @@ function ItemRow({
               </SelectContent>
             </Select>
 
-            <Badge variant="outline" className="h-8 rounded-full border-border/60 bg-background/40 px-3 text-xs">
+            <Badge variant="outline" className="h-8 rounded-full border-border/60 bg-muted/30 px-3 text-xs">
               {item.priority}
             </Badge>
 
@@ -940,19 +940,19 @@ function ItemRow({
               <Badge
                 key={label}
                 variant="outline"
-                className={`h-8 rounded-full border-border/60 bg-background/40 px-3 text-xs ${LABEL_COLORS[label as ItemLabel]}`}
+                className={`h-8 rounded-full border-border/60 bg-muted/30 px-3 text-xs ${LABEL_COLORS[label as ItemLabel]}`}
               >
                 <Tag className="mr-1 size-3" />
                 {label}
               </Badge>
             ))}
             {item.labels && item.labels.length > 2 ? (
-              <Badge variant="outline" className="h-8 rounded-full border-border/60 bg-background/40 px-3 text-xs">
+              <Badge variant="outline" className="h-8 rounded-full border-border/60 bg-muted/30 px-3 text-xs">
                 +{item.labels.length - 2}
               </Badge>
             ) : null}
 
-            <Badge variant="outline" className="h-8 rounded-full border-border/60 bg-background/40 px-3 text-xs">
+            <Badge variant="outline" className="h-8 rounded-full border-border/60 bg-muted/30 px-3 text-xs">
               {item.moduleId ? moduleById.get(item.moduleId)?.name ?? "--" : "--"}
             </Badge>
 
@@ -962,7 +962,7 @@ function ItemRow({
               onChange={(next) => onInlineScheduleChange(item, next.startDate, next.dueDate)}
             />
 
-            <Badge variant="outline" className="h-8 rounded-full border-border/60 bg-background/40 px-3 text-xs text-muted-foreground">
+            <Badge variant="outline" className="h-8 rounded-full border-border/60 bg-muted/30 px-3 text-xs text-muted-foreground">
               {formatDateCompact(item.createdAt) ?? "Created"}
             </Badge>
 
@@ -1036,7 +1036,7 @@ function InlineAssigneePicker({
         <Button
           type="button"
           variant="outline"
-          className="h-8 rounded-full border-border/60 bg-background/40 px-2"
+          className="h-8 rounded-full border-border/60 bg-muted/30 px-2"
           aria-label="Manage assignees"
         >
           {selectedAssignees.length === 0 ? (

@@ -61,6 +61,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { setTheme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const currentUser = useAppStore((state) => state.currentUser);
   const selectedModule = useAppStore((state) => state.selectedModule);
   const resetSession = useAppStore((state) => state.resetSession);
@@ -110,6 +111,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     toast.success(`${draftModule} module selected.`);
     router.push(`/app/projects?module=${encodeURIComponent(draftModule)}`);
   };
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     setDraftModule(selectedModule);
@@ -205,8 +210,15 @@ export function AppShell({ children }: { children: ReactNode }) {
                 onClick={() => setTheme(nextTheme)}
                 className="shrink-0"
                 aria-label="Toggle theme"
+                disabled={!mounted}
               >
-                {resolvedTheme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+                {!mounted ? (
+                  <Moon className="size-4" />
+                ) : resolvedTheme === "dark" ? (
+                  <Sun className="size-4" />
+                ) : (
+                  <Moon className="size-4" />
+                )}
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
