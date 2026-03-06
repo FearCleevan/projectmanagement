@@ -4,21 +4,30 @@ import Link from "next/link";
 import * as React from "react";
 import { useParams } from "next/navigation";
 import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  CheckCircle2,
   Check,
   CalendarDays,
   ChevronDown,
   ChevronRight,
+  Circle,
+  CircleDashed,
   Grid2x2,
   GripVertical,
   KanbanSquare,
   List,
   ListTodo,
+  LoaderCircle,
+  Minus,
   Plus,
   Search,
   Table2,
   Tag,
   User,
   Users,
+  XCircle,
 } from "lucide-react";
 import {
   DndContext,
@@ -78,11 +87,29 @@ import {
   type ItemStatus,
   type ProjectItem,
   type User as DomainUser,
+  normalizeItemStatus,
 } from "@/types/domain";
 
 const ALL_FILTER = "all";
 const STATUSES: ItemStatus[] = [...ITEM_STATUSES];
 const PRIORITIES: ItemPriority[] = ["Low", "Medium", "High", "Urgent"];
+const PRIORITY_OPTIONS = [
+  { value: "Urgent", label: "Urgent" },
+  { value: "High", label: "High" },
+  { value: "Medium", label: "Medium" },
+  { value: "Low", label: "Low" },
+] as const;
+
+type PriorityOptionValue = (typeof PRIORITY_OPTIONS)[number]["value"];
+type CanonicalStatusValue = (typeof ITEM_STATUSES)[number];
+const STATUS_OPTIONS: Array<{ value: CanonicalStatusValue; label: string }> = [
+  { value: "BACKLOG", label: "Backlog" },
+  { value: "TODO", label: "Todo" },
+  { value: "IN_PROGRESS", label: "In Progress" },
+  { value: "DONE", label: "Done" },
+  { value: "BACK_TO_DEV", label: "Back to Dev" },
+  { value: "BACK_TO_DESIGN", label: "Back to Design" },
+];
 const LABEL_COLORS: Record<ItemLabel, string> = {
   "UI/UX": "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300",
   Design: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
@@ -322,6 +349,15 @@ export default function ProjectDetailPage() {
       updatedAt: new Date().toISOString(),
     });
     toast.success("Assignees updated.");
+  };
+
+  const handleInlinePriorityChange = (item: ProjectItem, nextPriority: ItemPriority) => {
+    updateItem({
+      ...item,
+      priority: nextPriority,
+      updatedAt: new Date().toISOString(),
+    });
+    toast.success("Priority updated.");
   };
 
   const handleInlineModuleChange = (item: ProjectItem, nextModuleId?: string) => {
@@ -621,6 +657,7 @@ export default function ProjectDetailPage() {
                     }
                     onOpenItem={handleOpenItem}
                     onInlineStatusChange={handleInlineStatusChange}
+                    onInlinePriorityChange={handleInlinePriorityChange}
                     onInlineScheduleChange={handleInlineScheduleChange}
                     onInlineAssigneeChange={handleInlineAssigneeChange}
                     onInlineModuleChange={handleInlineModuleChange}
@@ -913,6 +950,7 @@ function ItemRow({
   onToggleExpand,
   onOpenItem,
   onInlineStatusChange,
+  onInlinePriorityChange,
   onInlineScheduleChange,
   onInlineAssigneeChange,
   onInlineModuleChange,
@@ -930,6 +968,7 @@ function ItemRow({
   onToggleExpand: (itemId: string) => void;
   onOpenItem: (itemId: string) => void;
   onInlineStatusChange: (item: ProjectItem, nextStatus: ItemStatus) => void;
+  onInlinePriorityChange: (item: ProjectItem, nextPriority: ItemPriority) => void;
   onInlineScheduleChange: (item: ProjectItem, nextStartDate?: string, nextDueDate?: string) => void;
   onInlineAssigneeChange: (item: ProjectItem, nextAssigneeIds: string[]) => void;
   onInlineModuleChange: (item: ProjectItem, nextModuleId?: string) => void;
@@ -984,22 +1023,15 @@ function ItemRow({
               <span className="text-[11px] text-muted-foreground">{progress}%</span>
             </div>
 
-            <Select value={item.status} onValueChange={(value) => onInlineStatusChange(item, value as ItemStatus)}>
-              <SelectTrigger className="h-8 w-[126px] rounded-md border-border/60 bg-muted/30 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUSES.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {status}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <InlineStatusPicker
+              status={item.status}
+              onChange={(nextStatus) => onInlineStatusChange(item, nextStatus)}
+            />
 
-            <Badge variant="outline" className="h-8 rounded-full border-border/60 bg-muted/30 px-3 text-xs">
-              {item.priority}
-            </Badge>
+            <InlinePriorityPicker
+              priority={item.priority}
+              onChange={(nextPriority) => onInlinePriorityChange(item, nextPriority)}
+            />
 
             <InlineAssigneePicker
               users={users}
@@ -1069,6 +1101,7 @@ function ItemRow({
               onToggleExpand={onToggleExpand}
               onOpenItem={onOpenItem}
               onInlineStatusChange={onInlineStatusChange}
+              onInlinePriorityChange={onInlinePriorityChange}
               onInlineScheduleChange={onInlineScheduleChange}
               onInlineAssigneeChange={onInlineAssigneeChange}
               onInlineModuleChange={onInlineModuleChange}
@@ -1108,42 +1141,47 @@ function InlineAssigneePicker({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-8 rounded-full border-border/60 bg-muted/30 px-2"
-          aria-label="Manage assignees"
-        >
-          {selectedAssignees.length === 0 ? (
-            <Users className="size-3.5 text-muted-foreground" />
-          ) : (
-            <AvatarGroup>
-              {selectedAssignees.slice(0, 2).map((assignee) => (
-                <Tooltip key={assignee.id}>
-                  <TooltipTrigger asChild>
-                    <Avatar size="sm">
-                      <AvatarImage src={assignee.avatarUrl} />
-                      <AvatarFallback>{getInitials(assignee.name)}</AvatarFallback>
-                    </Avatar>
-                  </TooltipTrigger>
-                  <TooltipContent>{assignee.name}</TooltipContent>
-                </Tooltip>
-              ))}
-              {selectedAssignees.length > 2 ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <AvatarGroupCount className="size-6 text-xs">
-                      +{selectedAssignees.length - 2}
-                    </AvatarGroupCount>
-                  </TooltipTrigger>
-                  <TooltipContent>{selectedAssignees.length} total</TooltipContent>
-                </Tooltip>
-              ) : null}
-            </AvatarGroup>
-          )}
-        </Button>
-      </PopoverTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-8 rounded-full border-border/60 bg-muted/30 px-2"
+              aria-label="Manage assignees"
+            >
+              {selectedAssignees.length === 0 ? (
+                <Users className="size-3.5 text-muted-foreground" />
+              ) : (
+                <AvatarGroup>
+                  {selectedAssignees.slice(0, 2).map((assignee) => (
+                    <Tooltip key={assignee.id}>
+                      <TooltipTrigger asChild>
+                        <Avatar size="sm">
+                          <AvatarImage src={assignee.avatarUrl} />
+                          <AvatarFallback>{getInitials(assignee.name)}</AvatarFallback>
+                        </Avatar>
+                      </TooltipTrigger>
+                      <TooltipContent>{assignee.name}</TooltipContent>
+                    </Tooltip>
+                  ))}
+                  {selectedAssignees.length > 2 ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AvatarGroupCount className="size-6 text-xs">
+                          +{selectedAssignees.length - 2}
+                        </AvatarGroupCount>
+                      </TooltipTrigger>
+                      <TooltipContent>{selectedAssignees.length} total</TooltipContent>
+                    </Tooltip>
+                  ) : null}
+                </AvatarGroup>
+              )}
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Assignees</TooltipContent>
+      </Tooltip>
       <PopoverContent align="end" className="w-[290px] p-0">
         <Command>
           <CommandInput placeholder="Search assignees..." />
@@ -1254,6 +1292,262 @@ function InlineModulePicker({
                   <Check className={`size-3.5 ${module.id === moduleId ? "opacity-100" : "opacity-0"}`} />
                 </CommandItem>
               ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function getStatusLabel(value: CanonicalStatusValue) {
+  return STATUS_OPTIONS.find((option) => option.value === value)?.label ?? "Backlog";
+}
+
+function getStatusStyle(value: CanonicalStatusValue) {
+  switch (value) {
+    case "BACKLOG":
+      return {
+        icon: CircleDashed,
+        textClass: "text-slate-400",
+        borderClass: "border-slate-400/40",
+        bgClass: "bg-slate-500/10",
+      };
+    case "TODO":
+      return {
+        icon: Circle,
+        textClass: "text-slate-300",
+        borderClass: "border-slate-300/40",
+        bgClass: "bg-slate-500/10",
+      };
+    case "IN_PROGRESS":
+      return {
+        icon: LoaderCircle,
+        textClass: "text-amber-500",
+        borderClass: "border-amber-500/40",
+        bgClass: "bg-amber-500/10",
+      };
+    case "DONE":
+      return {
+        icon: CheckCircle2,
+        textClass: "text-emerald-500",
+        borderClass: "border-emerald-500/40",
+        bgClass: "bg-emerald-500/10",
+      };
+    case "BACK_TO_DEV":
+      return {
+        icon: XCircle,
+        textClass: "text-slate-400",
+        borderClass: "border-slate-400/40",
+        bgClass: "bg-slate-500/10",
+      };
+    case "BACK_TO_DESIGN":
+      return {
+        icon: XCircle,
+        textClass: "text-slate-400",
+        borderClass: "border-slate-400/40",
+        bgClass: "bg-slate-500/10",
+      };
+    default:
+      return {
+        icon: CircleDashed,
+        textClass: "text-slate-400",
+        borderClass: "border-slate-400/40",
+        bgClass: "bg-slate-500/10",
+      };
+  }
+}
+
+function InlineStatusPicker({
+  status,
+  onChange,
+}: {
+  status: ItemStatus;
+  onChange: (nextStatus: ItemStatus) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const normalized = normalizeItemStatus(status);
+  const activeLabel = getStatusLabel(normalized);
+  const activeStyle = getStatusStyle(normalized);
+  const ActiveIcon = activeStyle.icon;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className={`h-8 gap-2 rounded-md px-2.5 text-xs ${activeStyle.borderClass} ${activeStyle.bgClass} hover:bg-muted/40`}
+              aria-label={`State: ${activeLabel}`}
+            >
+              <span className={`inline-flex size-4 items-center justify-center rounded border ${activeStyle.borderClass} ${activeStyle.bgClass}`}>
+                <ActiveIcon className={`size-3 ${activeStyle.textClass}`} />
+              </span>
+              <span>{activeLabel}</span>
+              <ChevronDown className="size-3 text-muted-foreground" />
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>State: {activeLabel}</TooltipContent>
+      </Tooltip>
+      <PopoverContent align="end" className="w-[240px] p-0">
+        <Command>
+          <CommandInput placeholder="Search status..." />
+          <CommandList>
+            <CommandEmpty>No status found.</CommandEmpty>
+            <CommandGroup>
+              {STATUS_OPTIONS.map((option) => {
+                const style = getStatusStyle(option.value);
+                const Icon = style.icon;
+                return (
+                  <CommandItem
+                    key={option.value}
+                    value={option.label}
+                    onSelect={() => {
+                      onChange(option.value);
+                      setOpen(false);
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <span className={`inline-flex size-4 items-center justify-center rounded border ${style.borderClass} ${style.bgClass}`}>
+                      <Icon className={`size-3 ${style.textClass}`} />
+                    </span>
+                    <span className="flex-1 truncate">{option.label}</span>
+                    <Check className={`size-3.5 ${normalized === option.value ? "opacity-100" : "opacity-0"}`} />
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function normalizePriorityValue(value: string | null | undefined): PriorityOptionValue | "None" {
+  switch (value) {
+    case "Urgent":
+      return "Urgent";
+    case "HIGH":
+    case "High":
+      return "High";
+    case "MEDIUM":
+    case "Medium":
+      return "Medium";
+    case "LOW":
+    case "Low":
+      return "Low";
+    default:
+      return "None";
+  }
+}
+
+function getPriorityStyle(value: PriorityOptionValue | "None") {
+  switch (value) {
+    case "Urgent":
+      return {
+        icon: AlertTriangle,
+        textClass: "text-red-500",
+        borderClass: "border-red-500/40",
+        bgClass: "bg-red-500/10",
+      };
+    case "High":
+      return {
+        icon: ArrowUp,
+        textClass: "text-orange-500",
+        borderClass: "border-orange-500/40",
+        bgClass: "bg-orange-500/10",
+      };
+    case "Medium":
+      return {
+        icon: Minus,
+        textClass: "text-amber-500",
+        borderClass: "border-amber-500/40",
+        bgClass: "bg-amber-500/10",
+      };
+    case "Low":
+      return {
+        icon: ArrowDown,
+        textClass: "text-blue-500",
+        borderClass: "border-blue-500/40",
+        bgClass: "bg-blue-500/10",
+      };
+    default:
+      return {
+        icon: Minus,
+        textClass: "text-muted-foreground",
+        borderClass: "border-border/60",
+        bgClass: "bg-muted/30",
+      };
+  }
+}
+
+function InlinePriorityPicker({
+  priority,
+  onChange,
+}: {
+  priority: ItemPriority;
+  onChange: (nextPriority: ItemPriority) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const normalized = normalizePriorityValue(priority);
+  const isUnset = normalized === "None";
+  const activeStyle = getPriorityStyle(normalized);
+  const ActiveIcon = activeStyle.icon;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className={`h-8 rounded-md text-xs ${activeStyle.borderClass} ${activeStyle.bgClass} hover:bg-muted/40 ${
+                isUnset ? "size-8 p-0" : "gap-2 px-2.5"
+              }`}
+              aria-label={isUnset ? "Assign priority" : `Priority: ${normalized}`}
+            >
+              <span className={`inline-flex size-4 items-center justify-center rounded border ${activeStyle.borderClass} ${activeStyle.bgClass}`}>
+                <ActiveIcon className={`size-3 ${activeStyle.textClass}`} />
+              </span>
+              {!isUnset ? <span>{normalized}</span> : null}
+              {!isUnset ? <ChevronDown className="size-3 text-muted-foreground" /> : null}
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>{isUnset ? "Assign priority" : `Priority: ${normalized}`}</TooltipContent>
+      </Tooltip>
+      <PopoverContent align="end" className="w-[220px] p-0">
+        <Command>
+          <CommandInput placeholder="Search priority..." />
+          <CommandList>
+            <CommandEmpty>No priority found.</CommandEmpty>
+            <CommandGroup>
+              {PRIORITY_OPTIONS.map((option) => {
+                const style = getPriorityStyle(option.value);
+                const Icon = style.icon;
+                return (
+                  <CommandItem
+                    key={option.value}
+                    value={option.label}
+                    onSelect={() => {
+                      onChange(option.value);
+                      setOpen(false);
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <span className={`inline-flex size-4 items-center justify-center rounded border ${style.borderClass} ${style.bgClass}`}>
+                      <Icon className={`size-3 ${style.textClass}`} />
+                    </span>
+                    <span className="flex-1 truncate">{option.label}</span>
+                    <Check className={`size-3.5 ${normalized === option.value ? "opacity-100" : "opacity-0"}`} />
+                  </CommandItem>
+                );
+              })}
             </CommandGroup>
           </CommandList>
         </Command>
