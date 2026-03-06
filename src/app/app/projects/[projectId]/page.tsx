@@ -8,6 +8,7 @@ import {
   CalendarDays,
   ChevronDown,
   ChevronRight,
+  Grid2x2,
   GripVertical,
   KanbanSquare,
   List,
@@ -119,6 +120,7 @@ export default function ProjectDetailPage() {
   const [statusFilter, setStatusFilter] = React.useState<string>(ALL_FILTER);
   const [priorityFilter, setPriorityFilter] = React.useState<string>(ALL_FILTER);
   const [moduleFilter, setModuleFilter] = React.useState<string>(ALL_FILTER);
+  const [moduleFilterOpen, setModuleFilterOpen] = React.useState(false);
   const [createModuleDialogOpen, setCreateModuleDialogOpen] = React.useState(false);
   const [newItemDialogOpen, setNewItemDialogOpen] = React.useState(false);
   const [itemSheetOpen, setItemSheetOpen] = React.useState(false);
@@ -210,6 +212,13 @@ export default function ProjectDetailPage() {
     () => new Map(users.map((user) => [user.id, user])),
     [users]
   );
+  const activeModuleLabel = React.useMemo(() => {
+    if (moduleFilter === ALL_FILTER) {
+      return "All Modules";
+    }
+
+    return projectModules.find((module) => module.id === moduleFilter)?.name ?? "Unknown Module";
+  }, [moduleFilter, projectModules]);
 
   const activeItem = React.useMemo(
     () => projectItems.find((item) => item.id === activeItemId) ?? null,
@@ -313,6 +322,15 @@ export default function ProjectDetailPage() {
       updatedAt: new Date().toISOString(),
     });
     toast.success("Assignees updated.");
+  };
+
+  const handleInlineModuleChange = (item: ProjectItem, nextModuleId?: string) => {
+    updateItem({
+      ...item,
+      moduleId: nextModuleId,
+      updatedAt: new Date().toISOString(),
+    });
+    toast.success("Module updated.");
   };
 
   if (!hydrated) {
@@ -471,19 +489,6 @@ export default function ProjectDetailPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={moduleFilter} onValueChange={setModuleFilter}>
-              <SelectTrigger className="w-full lg:w-[180px]">
-                <SelectValue placeholder="Filter module" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_FILTER}>All Modules</SelectItem>
-                {projectModules.map((module) => (
-                  <SelectItem key={module.id} value={module.id}>
-                    {module.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             {canCreateItems ? (
               <Button onClick={handleNewItem} className="w-full lg:w-auto">
                 <Plus className="mr-2 size-4" />
@@ -515,27 +520,91 @@ export default function ProjectDetailPage() {
         </TabsList>
 
         <TabsContent value="table">
-          {filteredRoots.length === 0 ? (
-            <EmptyState
-              icon={ListTodo}
-              title="No items in backlog view"
-              description="Try adjusting filters or create your first project item."
-              actionLabel={canCreateItems ? "New Item" : undefined}
-              onAction={canCreateItems ? handleNewItem : undefined}
-            />
-          ) : (
-            <Card className="overflow-hidden border-border/60 bg-card/70 shadow-sm">
-              <CardContent className="space-y-2 p-3">
-                <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
-                  <div className="inline-flex items-center gap-2 text-sm font-medium">
-                    <Table2 className="size-4 text-muted-foreground" />
-                    Backlog
-                  </div>
+          <Card className="overflow-hidden border-border/60 bg-card/70 shadow-sm">
+            <CardContent className="space-y-2 p-3">
+              <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                <div className="inline-flex items-center gap-2 text-sm font-medium">
+                  <Table2 className="size-4 text-muted-foreground" />
+                  Backlog
+                </div>
+                <div className="flex items-center gap-2">
+                  <Popover open={moduleFilterOpen} onOpenChange={setModuleFilterOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-8 gap-2 rounded-md border-border/60 bg-card/70 px-2.5 text-xs hover:bg-muted/40"
+                      >
+                        <span className="inline-flex size-4 items-center justify-center rounded border border-border/70 bg-muted/50">
+                          <Grid2x2 className="size-3 text-muted-foreground" />
+                        </span>
+                        <span className="max-w-[150px] truncate">{activeModuleLabel}</span>
+                        <ChevronDown className="size-3 text-muted-foreground" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-[320px] p-0">
+                      <Command>
+                        <CommandInput placeholder="Search modules..." />
+                        <CommandList>
+                          <CommandEmpty>No modules found.</CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              value="all modules"
+                              onSelect={() => {
+                                setModuleFilter(ALL_FILTER);
+                                setModuleFilterOpen(false);
+                              }}
+                              className="flex items-center gap-2"
+                            >
+                              <span className="inline-flex size-4 items-center justify-center rounded border border-border/70 bg-muted/50">
+                                <Grid2x2 className="size-3 text-muted-foreground" />
+                              </span>
+                              <span className="flex-1 truncate">All Modules</span>
+                              <Check
+                                className={`size-3.5 ${moduleFilter === ALL_FILTER ? "opacity-100" : "opacity-0"}`}
+                              />
+                            </CommandItem>
+                            {projectModules.map((module) => (
+                              <CommandItem
+                                key={module.id}
+                                value={module.name}
+                                onSelect={() => {
+                                  setModuleFilter(module.id);
+                                  setModuleFilterOpen(false);
+                                }}
+                                className="flex items-center gap-2"
+                              >
+                                <span className="inline-flex size-4 items-center justify-center rounded border border-border/70 bg-muted/50">
+                                  <Grid2x2 className="size-3 text-muted-foreground" />
+                                </span>
+                                <span className="flex-1 truncate">{module.name}</span>
+                                <Check
+                                  className={`size-3.5 ${moduleFilter === module.id ? "opacity-100" : "opacity-0"}`}
+                                />
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                   <Badge variant="outline" className="rounded-full">
                     {filteredItems.length} issues
                   </Badge>
                 </div>
-                {filteredRoots.map((item) => (
+              </div>
+              {filteredRoots.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border/60 bg-muted/15 p-2">
+                  <EmptyState
+                    icon={ListTodo}
+                    title="No items in backlog view"
+                    description="Try adjusting filters or create your first project item."
+                    actionLabel={canCreateItems ? "New Item" : undefined}
+                    onAction={canCreateItems ? handleNewItem : undefined}
+                  />
+                </div>
+              ) : (
+                filteredRoots.map((item) => (
                   <ItemRow
                     key={item.id}
                     item={item}
@@ -554,12 +623,13 @@ export default function ProjectDetailPage() {
                     onInlineStatusChange={handleInlineStatusChange}
                     onInlineScheduleChange={handleInlineScheduleChange}
                     onInlineAssigneeChange={handleInlineAssigneeChange}
+                    onInlineModuleChange={handleInlineModuleChange}
                     calculateItemProgress={calculateItemProgress}
                   />
-                ))}
-              </CardContent>
-            </Card>
-          )}
+                ))
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="list">
@@ -845,6 +915,7 @@ function ItemRow({
   onInlineStatusChange,
   onInlineScheduleChange,
   onInlineAssigneeChange,
+  onInlineModuleChange,
   calculateItemProgress,
 }: {
   item: ProjectItem;
@@ -861,6 +932,7 @@ function ItemRow({
   onInlineStatusChange: (item: ProjectItem, nextStatus: ItemStatus) => void;
   onInlineScheduleChange: (item: ProjectItem, nextStartDate?: string, nextDueDate?: string) => void;
   onInlineAssigneeChange: (item: ProjectItem, nextAssigneeIds: string[]) => void;
+  onInlineModuleChange: (item: ProjectItem, nextModuleId?: string) => void;
   calculateItemProgress: (itemId: string) => number;
 }) {
   const children = childrenByParentId.get(item.id) ?? [];
@@ -952,9 +1024,12 @@ function ItemRow({
               </Badge>
             ) : null}
 
-            <Badge variant="outline" className="h-8 rounded-full border-border/60 bg-muted/30 px-3 text-xs">
-              {item.moduleId ? moduleById.get(item.moduleId)?.name ?? "--" : "--"}
-            </Badge>
+            <InlineModulePicker
+              moduleById={moduleById}
+              modules={Array.from(moduleById.values())}
+              moduleId={item.moduleId}
+              onChange={(nextModuleId) => onInlineModuleChange(item, nextModuleId)}
+            />
 
             <DateRangePicker
               startDate={item.startDate}
@@ -996,6 +1071,7 @@ function ItemRow({
               onInlineStatusChange={onInlineStatusChange}
               onInlineScheduleChange={onInlineScheduleChange}
               onInlineAssigneeChange={onInlineAssigneeChange}
+              onInlineModuleChange={onInlineModuleChange}
               calculateItemProgress={calculateItemProgress}
             />
           ))
@@ -1092,6 +1168,92 @@ function InlineAssigneePicker({
                   </CommandItem>
                 );
               })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function InlineModulePicker({
+  modules,
+  moduleById,
+  moduleId,
+  onChange,
+}: {
+  modules: Module[];
+  moduleById: Map<string, Module>;
+  moduleId?: string;
+  onChange: (nextModuleId?: string) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const activeModule = moduleId ? moduleById.get(moduleId) : null;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className={`h-8 rounded-md border-border/60 bg-muted/30 text-xs hover:bg-muted/40 ${
+                activeModule ? "gap-2 px-2.5" : "size-8 p-0"
+              }`}
+              aria-label={activeModule ? `Module: ${activeModule.name}` : "Assign module"}
+            >
+              <span className="inline-flex size-4 items-center justify-center rounded border border-border/70 bg-muted/50">
+                <Grid2x2 className="size-3 text-muted-foreground" />
+              </span>
+              {activeModule ? (
+                <>
+                  <span className="max-w-[120px] truncate">{activeModule.name}</span>
+                  <ChevronDown className="size-3 text-muted-foreground" />
+                </>
+              ) : null}
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        {!activeModule ? <TooltipContent>Assign module</TooltipContent> : null}
+      </Tooltip>
+      <PopoverContent align="end" className="w-[300px] p-0">
+        <Command>
+          <CommandInput placeholder="Search modules..." />
+          <CommandList>
+            <CommandEmpty>No modules found.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="no module"
+                onSelect={() => {
+                  onChange(undefined);
+                  setOpen(false);
+                }}
+                className="flex items-center gap-2"
+              >
+                <span className="inline-flex size-4 items-center justify-center rounded border border-border/70 bg-muted/50">
+                  <Grid2x2 className="size-3 text-muted-foreground" />
+                </span>
+                <span className="flex-1 truncate">No Module</span>
+                <Check className={`size-3.5 ${!moduleId ? "opacity-100" : "opacity-0"}`} />
+              </CommandItem>
+              {modules.map((module) => (
+                <CommandItem
+                  key={module.id}
+                  value={module.name}
+                  onSelect={() => {
+                    onChange(module.id);
+                    setOpen(false);
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <span className="inline-flex size-4 items-center justify-center rounded border border-border/70 bg-muted/50">
+                    <Grid2x2 className="size-3 text-muted-foreground" />
+                  </span>
+                  <span className="flex-1 truncate">{module.name}</span>
+                  <Check className={`size-3.5 ${module.id === moduleId ? "opacity-100" : "opacity-0"}`} />
+                </CommandItem>
+              ))}
             </CommandGroup>
           </CommandList>
         </Command>
