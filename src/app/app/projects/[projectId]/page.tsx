@@ -1065,21 +1065,6 @@ function ItemRow({
               labels={item.labels ?? []}
               onChange={(nextLabels) => onInlineLabelsChange(item, nextLabels)}
             />
-            {(item.labels ?? []).slice(0, 3).map((label) => (
-              <Badge
-                key={`${item.id}-${label}`}
-                variant="outline"
-                className="h-8 rounded-md border-border/60 bg-card/60 px-2.5 text-xs"
-              >
-                <span className={`mr-1.5 inline-block size-2 rounded-full ${LABEL_SWATCH[label]}`} />
-                {label}
-              </Badge>
-            ))}
-            {(item.labels?.length ?? 0) > 3 ? (
-              <Badge variant="outline" className="h-8 rounded-md border-border/60 bg-card/60 px-2.5 text-xs">
-                +{(item.labels?.length ?? 0) - 3}
-              </Badge>
-            ) : null}
 
             <InlineModulePicker
               moduleById={moduleById}
@@ -1350,15 +1335,30 @@ function InlineLabelPicker({
               type="button"
               variant="outline"
               className={`h-8 rounded-md border-border/60 bg-muted/30 text-xs hover:bg-muted/40 ${
-                selectedLabels.length === 0 ? "size-8 p-0" : "gap-2 px-2.5"
+                selectedLabels.length === 0 ? "size-8 p-0" : "gap-1.5 px-2"
               }`}
               aria-label={selectedLabels.length === 0 ? "Assign labels" : `Labels: ${selectedLabels.join(", ")}`}
             >
-              <Tag className="size-3.5 text-muted-foreground" />
+              <Tag className="size-3.5 shrink-0 text-muted-foreground" />
               {selectedLabels.length > 0 ? (
                 <>
-                  <span>{selectedLabels.length}</span>
-                  <ChevronDown className="size-3 text-muted-foreground" />
+                  <div className="inline-flex items-center gap-1">
+                    {selectedLabels.slice(0, 3).map((label) => (
+                      <span
+                        key={label}
+                        className="inline-flex h-6 items-center rounded-md border border-border/60 bg-card/60 px-2"
+                      >
+                        <span className={`mr-1.5 inline-block size-2 rounded-full ${LABEL_SWATCH[label]}`} />
+                        <span className="max-w-[84px] truncate">{label}</span>
+                      </span>
+                    ))}
+                    {selectedLabels.length > 3 ? (
+                      <span className="inline-flex h-6 items-center rounded-md border border-border/60 bg-card/60 px-1.5">
+                        +{selectedLabels.length - 3}
+                      </span>
+                    ) : null}
+                  </div>
+                  <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
                 </>
               ) : null}
             </Button>
