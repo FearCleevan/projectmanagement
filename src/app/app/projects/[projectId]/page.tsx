@@ -1208,7 +1208,7 @@ function InlineModulePicker({
               </span>
               {activeModule ? (
                 <>
-                  <span className="max-w-[120px] truncate">{activeModule.name}</span>
+                  <span className="max-w-[119px] truncate">{activeModule.name}</span>
                   <ChevronDown className="size-3 text-muted-foreground" />
                 </>
               ) : null}
