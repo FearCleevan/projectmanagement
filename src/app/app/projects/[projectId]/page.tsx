@@ -1027,7 +1027,7 @@ function ItemRow({
             <InlineModulePicker
               moduleById={moduleById}
               modules={Array.from(moduleById.values())}
-              moduleId={item.moduleId}
+              moduleId={item.moduleId ?? undefined}
               onChange={(nextModuleId) => onInlineModuleChange(item, nextModuleId)}
             />
 
