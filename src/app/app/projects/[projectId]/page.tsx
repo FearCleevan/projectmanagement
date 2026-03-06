@@ -4,6 +4,7 @@ import Link from "next/link";
 import * as React from "react";
 import { useParams } from "next/navigation";
 import {
+  CircleDot,
   AlertTriangle,
   ArrowDown,
   ArrowUp,
@@ -80,6 +81,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useStoreHydrated } from "@/hooks/use-store-hydrated";
 import { useAppStore } from "@/store/app-store";
 import {
+  ITEM_LABELS,
   ITEM_STATUSES,
   type ItemLabel,
   type Module,
@@ -110,6 +112,19 @@ const STATUS_OPTIONS: Array<{ value: CanonicalStatusValue; label: string }> = [
   { value: "BACK_TO_DEV", label: "Back to Dev" },
   { value: "BACK_TO_DESIGN", label: "Back to Design" },
 ];
+const LABEL_OPTIONS: ItemLabel[] = [...ITEM_LABELS];
+const LABEL_SWATCH: Record<ItemLabel, string> = {
+  "UI/UX": "bg-cyan-500",
+  Design: "bg-purple-500",
+  Frontend: "bg-blue-500",
+  Backend: "bg-emerald-500",
+  Authentication: "bg-amber-500",
+  "API-Integration": "bg-orange-500",
+  "IT Admin": "bg-slate-500",
+  DevOps: "bg-indigo-500",
+  Testing: "bg-pink-500",
+  Documentation: "bg-teal-500",
+};
 const LABEL_COLORS: Record<ItemLabel, string> = {
   "UI/UX": "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300",
   Design: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
@@ -351,6 +366,15 @@ export default function ProjectDetailPage() {
     toast.success("Assignees updated.");
   };
 
+  const handleInlineLabelsChange = (item: ProjectItem, nextLabels: ItemLabel[]) => {
+    updateItem({
+      ...item,
+      labels: nextLabels,
+      updatedAt: new Date().toISOString(),
+    });
+    toast.success("Labels updated.");
+  };
+
   const handleInlinePriorityChange = (item: ProjectItem, nextPriority: ItemPriority) => {
     updateItem({
       ...item,
@@ -571,9 +595,7 @@ export default function ProjectDetailPage() {
                         variant="outline"
                         className="h-8 gap-2 rounded-md border-border/60 bg-card/70 px-2.5 text-xs hover:bg-muted/40"
                       >
-                        <span className="inline-flex size-4 items-center justify-center rounded border border-border/70 bg-muted/50">
-                          <Grid2x2 className="size-3 text-muted-foreground" />
-                        </span>
+                        <Grid2x2 className="size-3.5 text-muted-foreground" />
                         <span className="max-w-[150px] truncate">{activeModuleLabel}</span>
                         <ChevronDown className="size-3 text-muted-foreground" />
                       </Button>
@@ -592,9 +614,7 @@ export default function ProjectDetailPage() {
                               }}
                               className="flex items-center gap-2"
                             >
-                              <span className="inline-flex size-4 items-center justify-center rounded border border-border/70 bg-muted/50">
-                                <Grid2x2 className="size-3 text-muted-foreground" />
-                              </span>
+                              <Grid2x2 className="size-3.5 text-muted-foreground" />
                               <span className="flex-1 truncate">All Modules</span>
                               <Check
                                 className={`size-3.5 ${moduleFilter === ALL_FILTER ? "opacity-100" : "opacity-0"}`}
@@ -610,9 +630,7 @@ export default function ProjectDetailPage() {
                                 }}
                                 className="flex items-center gap-2"
                               >
-                                <span className="inline-flex size-4 items-center justify-center rounded border border-border/70 bg-muted/50">
-                                  <Grid2x2 className="size-3 text-muted-foreground" />
-                                </span>
+                                <Grid2x2 className="size-3.5 text-muted-foreground" />
                                 <span className="flex-1 truncate">{module.name}</span>
                                 <Check
                                   className={`size-3.5 ${moduleFilter === module.id ? "opacity-100" : "opacity-0"}`}
@@ -657,6 +675,7 @@ export default function ProjectDetailPage() {
                     }
                     onOpenItem={handleOpenItem}
                     onInlineStatusChange={handleInlineStatusChange}
+                    onInlineLabelsChange={handleInlineLabelsChange}
                     onInlinePriorityChange={handleInlinePriorityChange}
                     onInlineScheduleChange={handleInlineScheduleChange}
                     onInlineAssigneeChange={handleInlineAssigneeChange}
@@ -950,6 +969,7 @@ function ItemRow({
   onToggleExpand,
   onOpenItem,
   onInlineStatusChange,
+  onInlineLabelsChange,
   onInlinePriorityChange,
   onInlineScheduleChange,
   onInlineAssigneeChange,
@@ -968,6 +988,7 @@ function ItemRow({
   onToggleExpand: (itemId: string) => void;
   onOpenItem: (itemId: string) => void;
   onInlineStatusChange: (item: ProjectItem, nextStatus: ItemStatus) => void;
+  onInlineLabelsChange: (item: ProjectItem, nextLabels: ItemLabel[]) => void;
   onInlinePriorityChange: (item: ProjectItem, nextPriority: ItemPriority) => void;
   onInlineScheduleChange: (item: ProjectItem, nextStartDate?: string, nextDueDate?: string) => void;
   onInlineAssigneeChange: (item: ProjectItem, nextAssigneeIds: string[]) => void;
@@ -1040,19 +1061,23 @@ function ItemRow({
               onChange={(nextAssigneeIds) => onInlineAssigneeChange(item, nextAssigneeIds)}
             />
 
-            {(item.labels ?? []).slice(0, 2).map((label) => (
+            <InlineLabelPicker
+              labels={item.labels ?? []}
+              onChange={(nextLabels) => onInlineLabelsChange(item, nextLabels)}
+            />
+            {(item.labels ?? []).slice(0, 3).map((label) => (
               <Badge
-                key={label}
+                key={`${item.id}-${label}`}
                 variant="outline"
-                className={`h-8 rounded-full border-border/60 bg-muted/30 px-3 text-xs ${LABEL_COLORS[label as ItemLabel]}`}
+                className="h-8 rounded-md border-border/60 bg-card/60 px-2.5 text-xs"
               >
-                <Tag className="mr-1 size-3" />
+                <span className={`mr-1.5 inline-block size-2 rounded-full ${LABEL_SWATCH[label]}`} />
                 {label}
               </Badge>
             ))}
-            {item.labels && item.labels.length > 2 ? (
-              <Badge variant="outline" className="h-8 rounded-full border-border/60 bg-muted/30 px-3 text-xs">
-                +{item.labels.length - 2}
+            {(item.labels?.length ?? 0) > 3 ? (
+              <Badge variant="outline" className="h-8 rounded-md border-border/60 bg-card/60 px-2.5 text-xs">
+                +{(item.labels?.length ?? 0) - 3}
               </Badge>
             ) : null}
 
@@ -1101,6 +1126,7 @@ function ItemRow({
               onToggleExpand={onToggleExpand}
               onOpenItem={onOpenItem}
               onInlineStatusChange={onInlineStatusChange}
+              onInlineLabelsChange={onInlineLabelsChange}
               onInlinePriorityChange={onInlinePriorityChange}
               onInlineScheduleChange={onInlineScheduleChange}
               onInlineAssigneeChange={onInlineAssigneeChange}
@@ -1241,9 +1267,7 @@ function InlineModulePicker({
               }`}
               aria-label={activeModule ? `Module: ${activeModule.name}` : "Assign module"}
             >
-              <span className="inline-flex size-4 items-center justify-center rounded border border-border/70 bg-muted/50">
-                <Grid2x2 className="size-3 text-muted-foreground" />
-              </span>
+              <Grid2x2 className="size-3.5 text-muted-foreground" />
               {activeModule ? (
                 <>
                   <span className="max-w-[119px] truncate">{activeModule.name}</span>
@@ -1269,9 +1293,7 @@ function InlineModulePicker({
                 }}
                 className="flex items-center gap-2"
               >
-                <span className="inline-flex size-4 items-center justify-center rounded border border-border/70 bg-muted/50">
-                  <Grid2x2 className="size-3 text-muted-foreground" />
-                </span>
+                <Grid2x2 className="size-3.5 text-muted-foreground" />
                 <span className="flex-1 truncate">No Module</span>
                 <Check className={`size-3.5 ${!moduleId ? "opacity-100" : "opacity-0"}`} />
               </CommandItem>
@@ -1285,13 +1307,88 @@ function InlineModulePicker({
                   }}
                   className="flex items-center gap-2"
                 >
-                  <span className="inline-flex size-4 items-center justify-center rounded border border-border/70 bg-muted/50">
-                    <Grid2x2 className="size-3 text-muted-foreground" />
-                  </span>
+                  <Grid2x2 className="size-3.5 text-muted-foreground" />
                   <span className="flex-1 truncate">{module.name}</span>
                   <Check className={`size-3.5 ${module.id === moduleId ? "opacity-100" : "opacity-0"}`} />
                 </CommandItem>
               ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function InlineLabelPicker({
+  labels,
+  onChange,
+}: {
+  labels: ItemLabel[];
+  onChange: (nextLabels: ItemLabel[]) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const selectedLabels = React.useMemo(
+    () => labels.filter((label): label is ItemLabel => LABEL_OPTIONS.includes(label as ItemLabel)),
+    [labels]
+  );
+
+  const toggleLabel = (label: ItemLabel) => {
+    if (selectedLabels.includes(label)) {
+      onChange(selectedLabels.filter((current) => current !== label));
+      return;
+    }
+    onChange([...selectedLabels, label]);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className={`h-8 rounded-md border-border/60 bg-muted/30 text-xs hover:bg-muted/40 ${
+                selectedLabels.length === 0 ? "size-8 p-0" : "gap-2 px-2.5"
+              }`}
+              aria-label={selectedLabels.length === 0 ? "Assign labels" : `Labels: ${selectedLabels.join(", ")}`}
+            >
+              <Tag className="size-3.5 text-muted-foreground" />
+              {selectedLabels.length > 0 ? (
+                <>
+                  <span>{selectedLabels.length}</span>
+                  <ChevronDown className="size-3 text-muted-foreground" />
+                </>
+              ) : null}
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>
+          {selectedLabels.length === 0 ? "Labels: None" : `Labels: ${selectedLabels.join(", ")}`}
+        </TooltipContent>
+      </Tooltip>
+      <PopoverContent align="end" className="w-[280px] p-0">
+        <Command>
+          <CommandInput placeholder="Search labels..." />
+          <CommandList>
+            <CommandEmpty>No labels found.</CommandEmpty>
+            <CommandGroup>
+              {LABEL_OPTIONS.map((label) => {
+                const isSelected = selectedLabels.includes(label);
+                return (
+                  <CommandItem
+                    key={label}
+                    value={label}
+                    onSelect={() => toggleLabel(label)}
+                    className="flex items-center gap-2"
+                  >
+                    <CircleDot className={`size-3.5 ${LABEL_SWATCH[label].replace("bg-", "text-")}`} />
+                    <span className="flex-1 truncate">{label}</span>
+                    <Check className={`size-3.5 ${isSelected ? "opacity-100" : "opacity-0"}`} />
+                  </CommandItem>
+                );
+              })}
             </CommandGroup>
           </CommandList>
         </Command>
@@ -1382,9 +1479,7 @@ function InlineStatusPicker({
               className={`h-8 gap-2 rounded-md px-2.5 text-xs ${activeStyle.borderClass} ${activeStyle.bgClass} hover:bg-muted/40`}
               aria-label={`State: ${activeLabel}`}
             >
-              <span className={`inline-flex size-4 items-center justify-center rounded border ${activeStyle.borderClass} ${activeStyle.bgClass}`}>
-                <ActiveIcon className={`size-3 ${activeStyle.textClass}`} />
-              </span>
+              <ActiveIcon className={`size-3.5 ${activeStyle.textClass}`} />
               <span>{activeLabel}</span>
               <ChevronDown className="size-3 text-muted-foreground" />
             </Button>
@@ -1411,9 +1506,7 @@ function InlineStatusPicker({
                     }}
                     className="flex items-center gap-2"
                   >
-                    <span className={`inline-flex size-4 items-center justify-center rounded border ${style.borderClass} ${style.bgClass}`}>
-                      <Icon className={`size-3 ${style.textClass}`} />
-                    </span>
+                    <Icon className={`size-3.5 ${style.textClass}`} />
                     <span className="flex-1 truncate">{option.label}</span>
                     <Check className={`size-3.5 ${normalized === option.value ? "opacity-100" : "opacity-0"}`} />
                   </CommandItem>
@@ -1511,9 +1604,7 @@ function InlinePriorityPicker({
               }`}
               aria-label={isUnset ? "Assign priority" : `Priority: ${normalized}`}
             >
-              <span className={`inline-flex size-4 items-center justify-center rounded border ${activeStyle.borderClass} ${activeStyle.bgClass}`}>
-                <ActiveIcon className={`size-3 ${activeStyle.textClass}`} />
-              </span>
+              <ActiveIcon className={`size-3.5 ${activeStyle.textClass}`} />
               {!isUnset ? <span>{normalized}</span> : null}
               {!isUnset ? <ChevronDown className="size-3 text-muted-foreground" /> : null}
             </Button>
@@ -1540,9 +1631,7 @@ function InlinePriorityPicker({
                     }}
                     className="flex items-center gap-2"
                   >
-                    <span className={`inline-flex size-4 items-center justify-center rounded border ${style.borderClass} ${style.bgClass}`}>
-                      <Icon className={`size-3 ${style.textClass}`} />
-                    </span>
+                    <Icon className={`size-3.5 ${style.textClass}`} />
                     <span className="flex-1 truncate">{option.label}</span>
                     <Check className={`size-3.5 ${normalized === option.value ? "opacity-100" : "opacity-0"}`} />
                   </CommandItem>
