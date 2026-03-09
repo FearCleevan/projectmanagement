@@ -66,6 +66,18 @@ import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
 
 const ITEM_PRIORITIES: ItemPriority[] = ["Low", "Medium", "High", "Urgent"];
+const LABEL_CHIP_COLORS: Record<string, string> = {
+  "UI/UX": "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
+  Design: "bg-purple-500/15 text-purple-300 border-purple-500/30",
+  Frontend: "bg-blue-500/15 text-blue-300 border-blue-500/30",
+  Backend: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  Authentication: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  "API-Integration": "bg-orange-500/15 text-orange-300 border-orange-500/30",
+  "IT Admin": "bg-slate-500/15 text-slate-300 border-slate-500/30",
+  DevOps: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30",
+  Testing: "bg-pink-500/15 text-pink-300 border-pink-500/30",
+  Documentation: "bg-teal-500/15 text-teal-300 border-teal-500/30",
+};
 
 type ItemSheetProps = {
   open: boolean;
@@ -383,7 +395,7 @@ export function ItemSheet({
                 <h3 className="text-sm font-semibold">Properties</h3>
                 <div className="divide-y rounded-md border">
                   <PropertyRow label="State"><StatusPicker value={draft.status} disabled={!canEditStatus} open={openPickers.status} onOpenChange={(open) => setOpenPickers((s) => ({ ...s, status: open }))} onChange={(status) => void persistPatch({ status })} /></PropertyRow>
-                  <PropertyRow label="Assignees"><AssigneePicker users={users} assigneeIds={draft.assigneeIds} disabled={!canEditFull} open={openPickers.assignees} onOpenChange={(open) => setOpenPickers((s) => ({ ...s, assignees: open }))} onToggle={toggleAssignee} selectedLabel={selectedAssignees.length === 0 ? "Add assignees" : selectedAssignees.map((a) => a.name).join(", ")} /></PropertyRow>
+                  <PropertyRow label="Assignees"><AssigneePicker users={users} assigneeIds={draft.assigneeIds} disabled={!canEditFull} open={openPickers.assignees} onOpenChange={(open) => setOpenPickers((s) => ({ ...s, assignees: open }))} onToggle={toggleAssignee} selectedLabel={selectedAssignees.length === 0 ? "Add assignees" : selectedAssignees.map((a) => a.name).join(", ")} selectedContent={selectedAssignees.length > 0 ? <div className="flex flex-wrap gap-1">{selectedAssignees.map((assignee) => <span key={assignee.id} className="inline-flex h-6 items-center rounded-md border border-blue-500/30 bg-blue-500/15 px-2 text-xs text-blue-200">{assignee.name}</span>)}</div> : undefined} /></PropertyRow>
                   <PropertyRow label="Priority"><PriorityPicker value={draft.priority} disabled={!canEditFull} open={openPickers.priority} onOpenChange={(open) => setOpenPickers((s) => ({ ...s, priority: open }))} onChange={(priority) => void persistPatch({ priority })} /></PropertyRow>
                   <PropertyRow label="Created by"><div className="px-2 text-sm">{creator?.name ?? "Unknown User"}</div></PropertyRow>
                   <PropertyRow label="Schedule">
@@ -401,7 +413,7 @@ export function ItemSheet({
                   </PropertyRow>
                   <PropertyRow label="Modules"><SimplePicker icon={<Grid2x2 className="mr-2 size-3.5 text-muted-foreground" />} open={openPickers.module} onOpenChange={(open) => setOpenPickers((s) => ({ ...s, module: open }))} disabled={!canEditFull} label={selectedModule?.name ?? "No module"} placeholder="Search modules..." empty="No modules found." items={[{ id: "none", label: "No module" }, ...modules.map((module) => ({ id: module.id, label: module.name }))]} selectedId={draft.moduleId ?? "none"} onSelect={(id) => void persistPatch({ moduleId: id === "none" ? null : id })} /></PropertyRow>
                   <PropertyRow label="Parent"><SimplePicker open={openPickers.parent} onOpenChange={(open) => setOpenPickers((s) => ({ ...s, parent: open }))} disabled={!canEditFull} label={selectedParent ? `${selectedParent.ticketId} - ${selectedParent.title}` : "Add parent work item"} placeholder="Search parent items..." empty="No parent items found." items={[{ id: "none", label: "No parent" }, ...parentCandidates.map((parent) => ({ id: parent.id, label: `${parent.ticketId} - ${parent.title}` }))]} selectedId={draft.parentId ?? "none"} onSelect={(id) => void persistPatch({ parentId: id === "none" ? null : id })} /></PropertyRow>
-                  <PropertyRow label="Labels"><AssigneePicker users={[]} assigneeIds={[]} disabled={!canEditFull} open={openPickers.labels} onOpenChange={(open) => setOpenPickers((s) => ({ ...s, labels: open }))} onToggle={() => undefined} selectedLabel={(draft.labels ?? []).length === 0 ? "Add labels" : (draft.labels ?? []).join(", ")} icon={<Tag className="mr-2 size-3.5 text-muted-foreground" />} placeholder="Search labels..." empty="No labels found." customItems={ITEM_LABELS.map((label) => ({ id: label, label }))} isSelected={(id) => (draft.labels ?? []).includes(id as ItemLabel)} onCustomSelect={(id) => toggleLabel(id as ItemLabel)} /></PropertyRow>
+                  <PropertyRow label="Labels"><AssigneePicker users={[]} assigneeIds={[]} disabled={!canEditFull} open={openPickers.labels} onOpenChange={(open) => setOpenPickers((s) => ({ ...s, labels: open }))} onToggle={() => undefined} selectedLabel={(draft.labels ?? []).length === 0 ? "Add labels" : (draft.labels ?? []).join(", ")} selectedContent={(draft.labels ?? []).length > 0 ? <div className="flex flex-wrap gap-1">{(draft.labels ?? []).map((label) => <span key={label} className={cn("inline-flex h-6 items-center rounded-md border px-2 text-xs", LABEL_CHIP_COLORS[label] ?? "border-border/60 bg-muted/40 text-foreground")}>{label}</span>)}</div> : undefined} icon={<Tag className="mr-2 size-3.5 text-muted-foreground" />} placeholder="Search labels..." empty="No labels found." customItems={ITEM_LABELS.map((label) => ({ id: label, label }))} isSelected={(id) => (draft.labels ?? []).includes(id as ItemLabel)} onCustomSelect={(id) => toggleLabel(id as ItemLabel)} /></PropertyRow>
                 </div>
               </section>
 
@@ -508,20 +520,21 @@ function PriorityPicker({
   onOpenChange,
   onChange,
 }: {
-  value: ItemPriority;
+  value: string;
   disabled: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onChange: (priority: ItemPriority) => void;
 }) {
-  const style = getPriorityStyle(value);
+  const normalized = normalizePriorityValue(value);
+  const style = getPriorityStyle(normalized);
   const Icon = style.icon;
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
         <Button type="button" variant="ghost" disabled={disabled} className="h-8 w-full justify-start px-2 text-left text-sm hover:bg-muted/50">
           <Icon className={cn("mr-2 size-3.5", style.textClass)} />
-          <span>{value}</span>
+          <span>{normalized}</span>
           <ChevronDown className="ml-auto size-3 text-muted-foreground" />
         </Button>
       </PopoverTrigger>
@@ -535,7 +548,7 @@ function PriorityPicker({
                 <CommandItem key={priority} value={priority} onSelect={() => { onChange(priority); onOpenChange(false); }} className="flex items-center gap-2">
                   {React.createElement(getPriorityStyle(priority).icon, { className: cn("size-3.5", getPriorityStyle(priority).textClass) })}
                   <span className="flex-1 truncate">{priority}</span>
-                  <Check className={cn("size-3.5", value === priority ? "opacity-100" : "opacity-0")} />
+                  <Check className={cn("size-3.5", normalized === priority ? "opacity-100" : "opacity-0")} />
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -554,6 +567,7 @@ function AssigneePicker({
   onOpenChange,
   onToggle,
   selectedLabel,
+  selectedContent,
   icon,
   placeholder = "Search assignees...",
   empty = "No users found.",
@@ -568,6 +582,7 @@ function AssigneePicker({
   onOpenChange: (open: boolean) => void;
   onToggle: (id: string) => void;
   selectedLabel: string;
+  selectedContent?: React.ReactNode;
   icon?: React.ReactNode;
   placeholder?: string;
   empty?: string;
@@ -580,7 +595,7 @@ function AssigneePicker({
       <PopoverTrigger asChild>
         <Button type="button" variant="ghost" disabled={disabled} className="h-8 w-full justify-start px-2 text-left text-sm hover:bg-muted/50">
           {icon ?? <Users className="mr-2 size-3.5 text-muted-foreground" />}
-          <span className="truncate">{selectedLabel}</span>
+          {selectedContent ?? <span className="truncate">{selectedLabel}</span>}
           <ChevronDown className="ml-auto size-3 text-muted-foreground" />
         </Button>
       </PopoverTrigger>
@@ -694,6 +709,21 @@ function getStatusStyle(status: ItemStatus) {
       return { icon: CheckCircle2, textClass: "text-emerald-500" };
     default:
       return { icon: XCircle, textClass: "text-slate-400" };
+  }
+}
+
+function normalizePriorityValue(value: string | null | undefined): ItemPriority {
+  switch ((value ?? "").toUpperCase()) {
+    case "URGENT":
+      return "Urgent";
+    case "HIGH":
+      return "High";
+    case "MEDIUM":
+      return "Medium";
+    case "LOW":
+      return "Low";
+    default:
+      return "Medium";
   }
 }
 
