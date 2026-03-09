@@ -1,7 +1,26 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, MessageSquareText, MoreHorizontal, Save } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  Circle,
+  CircleDashed,
+  Grid2x2,
+  Loader2,
+  LoaderCircle,
+  MessageSquareText,
+  Minus,
+  MoreHorizontal,
+  Save,
+  Tag,
+  Users,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -23,16 +42,18 @@ import { RichTextEditor } from "@/components/ui-kit/rich-text-editor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import {
   DropdownMenu,
@@ -49,6 +70,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useAppStore } from "@/store/app-store";
+import { cn } from "@/lib/utils";
 
 const ITEM_PRIORITIES: ItemPriority[] = ["Low", "Medium", "High", "Urgent"];
 
@@ -92,6 +114,13 @@ export function ItemSheet({
   const [pendingItemAction, setPendingItemAction] = React.useState<"archive" | "delete" | null>(null);
   const [subWorkTitle, setSubWorkTitle] = React.useState("");
   const [isSaving, setIsSaving] = React.useState(false);
+  const [statusPickerOpen, setStatusPickerOpen] = React.useState(false);
+  const [parentPickerOpen, setParentPickerOpen] = React.useState(false);
+  const [modulePickerOpen, setModulePickerOpen] = React.useState(false);
+  const [priorityPickerOpen, setPriorityPickerOpen] = React.useState(false);
+  const [assigneePickerOpen, setAssigneePickerOpen] = React.useState(false);
+  const [labelPickerOpen, setLabelPickerOpen] = React.useState(false);
+  const allItems = useAppStore((state) => state.items);
   const getChildItems = useAppStore((state) => state.getChildItems);
   const calculateItemProgress = useAppStore((state) => state.calculateItemProgress);
 
@@ -99,6 +128,12 @@ export function ItemSheet({
     setDraft(item);
     setNewComment("");
     setSubWorkTitle("");
+    setStatusPickerOpen(false);
+    setParentPickerOpen(false);
+    setModulePickerOpen(false);
+    setPriorityPickerOpen(false);
+    setAssigneePickerOpen(false);
+    setLabelPickerOpen(false);
   }, [item, open]);
 
   const itemComments = React.useMemo(() => {
@@ -118,6 +153,25 @@ export function ItemSheet({
 
     return getChildItems(item.id);
   }, [getChildItems, item]);
+
+  const parentCandidates = React.useMemo(() => {
+    if (!draft) {
+      return [];
+    }
+
+    return allItems.filter(
+      (candidate) =>
+        candidate.projectId === draft.projectId &&
+        !candidate.archived &&
+        candidate.parentId == null &&
+        candidate.id !== draft.id
+    );
+  }, [allItems, draft]);
+
+  const selectedParent = React.useMemo(
+    () => parentCandidates.find((candidate) => candidate.id === draft?.parentId) ?? null,
+    [draft?.parentId, parentCandidates]
+  );
 
   const updateDraft = (patch: Partial<ProjectItem>) => {
     setDraft((current) => (current ? { ...current, ...patch } : current));
@@ -360,95 +414,393 @@ export function ItemSheet({
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Status</Label>
-                  <Select
-                    value={draft.status}
-                    onValueChange={(value) => updateDraft({ status: value as ItemStatus })}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ITEM_STATUSES.map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {status}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={statusPickerOpen} onOpenChange={setStatusPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className={cn(
+                          "h-9 w-full justify-between rounded-md text-xs font-normal hover:bg-muted/40",
+                          getStatusStyle(draft.status).borderClass,
+                          getStatusStyle(draft.status).bgClass
+                        )}
+                      >
+                        <span className="inline-flex items-center gap-2 truncate">
+                          {(() => {
+                            const style = getStatusStyle(draft.status);
+                            const Icon = style.icon;
+                            return (
+                              <>
+                                <Icon className={cn("size-3.5", style.textClass)} />
+                                {getStatusLabel(draft.status)}
+                              </>
+                            );
+                          })()}
+                        </span>
+                        <ChevronDown className="size-3 text-muted-foreground" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-[320px] p-0">
+                      <Command>
+                        <CommandInput placeholder="Search status..." />
+                        <CommandList>
+                          <CommandEmpty>No status found.</CommandEmpty>
+                          <CommandGroup>
+                            {ITEM_STATUSES.map((status) => {
+                              const style = getStatusStyle(status);
+                              const Icon = style.icon;
+                              return (
+                                <CommandItem
+                                  key={status}
+                                  value={getStatusLabel(status)}
+                                  onSelect={() => {
+                                    updateDraft({ status: status as ItemStatus });
+                                    setStatusPickerOpen(false);
+                                  }}
+                                  className="flex items-center gap-2"
+                                >
+                                  <Icon className={cn("size-3.5", style.textClass)} />
+                                  <span className="flex-1 truncate">{getStatusLabel(status)}</span>
+                                  <Check
+                                    className={cn(
+                                      "size-3.5",
+                                      normalizeItemStatus(draft.status) === normalizeItemStatus(status)
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    )}
+                                  />
+                                </CommandItem>
+                              );
+                            })}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="space-y-2">
+                  <Label>Parent Item</Label>
+                  <Popover open={parentPickerOpen} onOpenChange={setParentPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={!canEditFull}
+                        className="h-9 w-full justify-between rounded-md border-border/60 bg-muted/30 text-xs font-normal hover:bg-muted/40"
+                      >
+                        <span className="truncate">
+                          {selectedParent ? `${selectedParent.ticketId} - ${selectedParent.title}` : "No Parent"}
+                        </span>
+                        <ChevronDown className="size-3 text-muted-foreground" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-[420px] p-0">
+                      <Command>
+                        <CommandInput placeholder="Search parent items..." />
+                        <CommandList>
+                          <CommandEmpty>No parent items found.</CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              value="no parent"
+                              onSelect={() => {
+                                if (!canEditFull) {
+                                  return;
+                                }
+                                updateDraft({ parentId: null });
+                                setParentPickerOpen(false);
+                              }}
+                              className="flex items-center gap-2"
+                            >
+                              <span className="flex-1 truncate">No Parent</span>
+                              <Check
+                                className={cn("size-3.5", !draft.parentId ? "opacity-100" : "opacity-0")}
+                              />
+                            </CommandItem>
+                            {parentCandidates.map((parent) => (
+                              <CommandItem
+                                key={parent.id}
+                                value={`${parent.ticketId} ${parent.title}`}
+                                onSelect={() => {
+                                  if (!canEditFull) {
+                                    return;
+                                  }
+                                  updateDraft({ parentId: parent.id });
+                                  setParentPickerOpen(false);
+                                }}
+                                className="flex items-center gap-2"
+                              >
+                                <span className="flex-1 truncate">{parent.ticketId} - {parent.title}</span>
+                                <Check
+                                  className={cn(
+                                    "size-3.5",
+                                    draft.parentId === parent.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="space-y-2">
                   <Label>Module</Label>
-                  <Select
-                    value={draft.moduleId ?? "none"}
-                    onValueChange={(value) =>
-                      updateDraft({ moduleId: value === "none" ? null : value })
-                    }
-                    disabled={!canEditFull}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No Module</SelectItem>
-                      {modules.map((module) => (
-                        <SelectItem key={module.id} value={module.id}>
-                          {module.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={modulePickerOpen} onOpenChange={setModulePickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={!canEditFull}
+                        className="h-9 w-full justify-between rounded-md border-border/60 bg-muted/30 text-xs font-normal hover:bg-muted/40"
+                      >
+                        <span className="inline-flex items-center gap-2 truncate">
+                          <Grid2x2 className="size-3.5 text-muted-foreground" />
+                          {modules.find((module) => module.id === draft.moduleId)?.name ?? "No Module"}
+                        </span>
+                        <ChevronDown className="size-3 text-muted-foreground" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-[320px] p-0">
+                      <Command>
+                        <CommandInput placeholder="Search modules..." />
+                        <CommandList>
+                          <CommandEmpty>No modules found.</CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              value="no module"
+                              onSelect={() => {
+                                if (!canEditFull) {
+                                  return;
+                                }
+                                updateDraft({ moduleId: null });
+                                setModulePickerOpen(false);
+                              }}
+                              className="flex items-center gap-2"
+                            >
+                              <Grid2x2 className="size-3.5 text-muted-foreground" />
+                              <span className="flex-1 truncate">No Module</span>
+                              <Check
+                                className={cn("size-3.5", !draft.moduleId ? "opacity-100" : "opacity-0")}
+                              />
+                            </CommandItem>
+                            {modules.map((module) => (
+                              <CommandItem
+                                key={module.id}
+                                value={module.name}
+                                onSelect={() => {
+                                  if (!canEditFull) {
+                                    return;
+                                  }
+                                  updateDraft({ moduleId: module.id });
+                                  setModulePickerOpen(false);
+                                }}
+                                className="flex items-center gap-2"
+                              >
+                                <Grid2x2 className="size-3.5 text-muted-foreground" />
+                                <span className="flex-1 truncate">{module.name}</span>
+                                <Check
+                                  className={cn(
+                                    "size-3.5",
+                                    draft.moduleId === module.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="space-y-2">
                   <Label>Priority</Label>
-                  <Select
-                    value={draft.priority}
-                    onValueChange={(value) => updateDraft({ priority: value as ItemPriority })}
-                    disabled={!canEditFull}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ITEM_PRIORITIES.map((priority) => (
-                        <SelectItem key={priority} value={priority}>
-                          {priority}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={priorityPickerOpen} onOpenChange={setPriorityPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={!canEditFull}
+                        className={cn(
+                          "h-9 w-full justify-between rounded-md text-xs font-normal hover:bg-muted/40",
+                          getPriorityStyle(draft.priority).borderClass,
+                          getPriorityStyle(draft.priority).bgClass
+                        )}
+                      >
+                        <span className="inline-flex items-center gap-2 truncate">
+                          {(() => {
+                            const style = getPriorityStyle(draft.priority);
+                            const Icon = style.icon;
+                            return (
+                              <>
+                                <Icon className={cn("size-3.5", style.textClass)} />
+                                {draft.priority}
+                              </>
+                            );
+                          })()}
+                        </span>
+                        <ChevronDown className="size-3 text-muted-foreground" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-[280px] p-0">
+                      <Command>
+                        <CommandInput placeholder="Search priority..." />
+                        <CommandList>
+                          <CommandEmpty>No priority found.</CommandEmpty>
+                          <CommandGroup>
+                            {ITEM_PRIORITIES.map((priority) => {
+                              const style = getPriorityStyle(priority);
+                              const Icon = style.icon;
+                              return (
+                                <CommandItem
+                                  key={priority}
+                                  value={priority}
+                                  onSelect={() => {
+                                    if (!canEditFull) {
+                                      return;
+                                    }
+                                    updateDraft({ priority });
+                                    setPriorityPickerOpen(false);
+                                  }}
+                                  className="flex items-center gap-2"
+                                >
+                                  <Icon className={cn("size-3.5", style.textClass)} />
+                                  <span className="flex-1 truncate">{priority}</span>
+                                  <Check
+                                    className={cn(
+                                      "size-3.5",
+                                      draft.priority === priority ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                </CommandItem>
+                              );
+                            })}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label>Assignees</Label>
-                <div className="max-h-28 space-y-2 overflow-auto rounded-md border p-2">
-                  {users.map((user) => (
-                    <label key={user.id} className="flex items-center justify-between rounded px-2 py-1 text-sm hover:bg-muted/50">
-                      <span>{user.name}</span>
-                      <Checkbox
-                        checked={draft.assigneeIds.includes(user.id)}
-                        disabled={!canEditFull}
-                        onCheckedChange={(checked) => toggleAssignee(user.id, checked === true)}
-                      />
-                    </label>
-                  ))}
-                </div>
+                <Popover open={assigneePickerOpen} onOpenChange={setAssigneePickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!canEditFull}
+                      className="h-9 w-full justify-between rounded-md border-border/60 bg-muted/30 text-xs font-normal hover:bg-muted/40"
+                    >
+                      <span className="inline-flex items-center gap-2 truncate">
+                        <Users className="size-3.5 text-muted-foreground" />
+                        {draft.assigneeIds.length === 0
+                          ? "Select assignees"
+                          : `${draft.assigneeIds.length} selected`}
+                      </span>
+                      <ChevronDown className="size-3 text-muted-foreground" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-[320px] p-0">
+                    <Command>
+                      <CommandInput placeholder="Search assignees..." />
+                      <CommandList>
+                        <CommandEmpty>No users found.</CommandEmpty>
+                        <CommandGroup>
+                          {users.map((user) => {
+                            const isSelected = draft.assigneeIds.includes(user.id);
+                            return (
+                              <CommandItem
+                                key={user.id}
+                                value={`${user.name} ${user.email}`}
+                                onSelect={() => {
+                                  if (!canEditFull) {
+                                    return;
+                                  }
+                                  toggleAssignee(user.id, !isSelected);
+                                }}
+                                className="flex items-center gap-2"
+                              >
+                                <span className="flex-1 truncate">{user.name}</span>
+                                <Check className={cn("size-3.5", isSelected ? "opacity-100" : "opacity-0")} />
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {draft.assigneeIds.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {users
+                      .filter((user) => draft.assigneeIds.includes(user.id))
+                      .map((user) => (
+                        <Badge key={user.id} variant="secondary" className="font-normal">
+                          {user.name}
+                        </Badge>
+                      ))}
+                  </div>
+                ) : null}
               </div>
 
               <div className="space-y-2">
                 <Label>Labels</Label>
-                <div className="grid gap-2 rounded-md border p-2 sm:grid-cols-2">
-                  {ITEM_LABELS.map((label) => (
-                    <label key={label} className="flex items-center justify-between rounded px-2 py-1 text-sm hover:bg-muted/50">
-                      <span>{label}</span>
-                      <Checkbox
-                        checked={(draft.labels ?? []).includes(label)}
-                        disabled={!canEditFull}
-                        onCheckedChange={(checked) => toggleLabel(label, checked === true)}
-                      />
-                    </label>
-                  ))}
-                </div>
+                <Popover open={labelPickerOpen} onOpenChange={setLabelPickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!canEditFull}
+                      className="h-9 w-full justify-between rounded-md border-border/60 bg-muted/30 text-xs font-normal hover:bg-muted/40"
+                    >
+                      <span className="inline-flex items-center gap-2 truncate">
+                        <Tag className="size-3.5 text-muted-foreground" />
+                        {(draft.labels ?? []).length === 0 ? "Select labels" : `${(draft.labels ?? []).length} selected`}
+                      </span>
+                      <ChevronDown className="size-3 text-muted-foreground" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-[320px] p-0">
+                    <Command>
+                      <CommandInput placeholder="Search labels..." />
+                      <CommandList>
+                        <CommandEmpty>No labels found.</CommandEmpty>
+                        <CommandGroup>
+                          {ITEM_LABELS.map((label) => {
+                            const isSelected = (draft.labels ?? []).includes(label);
+                            return (
+                              <CommandItem
+                                key={label}
+                                value={label}
+                                onSelect={() => {
+                                  if (!canEditFull) {
+                                    return;
+                                  }
+                                  toggleLabel(label, !isSelected);
+                                }}
+                                className="flex items-center gap-2"
+                              >
+                                <span className="flex-1 truncate">{label}</span>
+                                <Check className={cn("size-3.5", isSelected ? "opacity-100" : "opacity-0")} />
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {(draft.labels ?? []).length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {(draft.labels ?? []).map((label) => (
+                      <Badge key={label} variant="outline" className="font-normal">
+                        {label}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : null}
               </div>
 
               <div className="space-y-2">
@@ -602,6 +954,105 @@ export function ItemSheet({
       />
     </Sheet>
   );
+}
+
+function getStatusLabel(status: ItemStatus) {
+  switch (normalizeItemStatus(status)) {
+    case "BACKLOG":
+      return "Backlog";
+    case "TODO":
+      return "Todo";
+    case "IN_PROGRESS":
+      return "In Progress";
+    case "DONE":
+      return "Done";
+    case "BACK_TO_DEV":
+      return "Back to Dev";
+    case "BACK_TO_DESIGN":
+      return "Back to Design";
+    default:
+      return "Backlog";
+  }
+}
+
+function getStatusStyle(status: ItemStatus) {
+  switch (normalizeItemStatus(status)) {
+    case "BACKLOG":
+      return {
+        icon: CircleDashed,
+        textClass: "text-slate-400",
+        borderClass: "border-slate-400/40",
+        bgClass: "bg-slate-500/10",
+      };
+    case "TODO":
+      return {
+        icon: Circle,
+        textClass: "text-slate-300",
+        borderClass: "border-slate-300/40",
+        bgClass: "bg-slate-500/10",
+      };
+    case "IN_PROGRESS":
+      return {
+        icon: LoaderCircle,
+        textClass: "text-amber-500",
+        borderClass: "border-amber-500/40",
+        bgClass: "bg-amber-500/10",
+      };
+    case "DONE":
+      return {
+        icon: CheckCircle2,
+        textClass: "text-emerald-500",
+        borderClass: "border-emerald-500/40",
+        bgClass: "bg-emerald-500/10",
+      };
+    default:
+      return {
+        icon: XCircle,
+        textClass: "text-slate-400",
+        borderClass: "border-slate-400/40",
+        bgClass: "bg-slate-500/10",
+      };
+  }
+}
+
+function getPriorityStyle(priority: ItemPriority) {
+  switch (priority) {
+    case "Urgent":
+      return {
+        icon: AlertTriangle,
+        textClass: "text-red-500",
+        borderClass: "border-red-500/40",
+        bgClass: "bg-red-500/10",
+      };
+    case "High":
+      return {
+        icon: ArrowUp,
+        textClass: "text-orange-500",
+        borderClass: "border-orange-500/40",
+        bgClass: "bg-orange-500/10",
+      };
+    case "Medium":
+      return {
+        icon: Minus,
+        textClass: "text-amber-500",
+        borderClass: "border-amber-500/40",
+        bgClass: "bg-amber-500/10",
+      };
+    case "Low":
+      return {
+        icon: ArrowDown,
+        textClass: "text-blue-500",
+        borderClass: "border-blue-500/40",
+        bgClass: "bg-blue-500/10",
+      };
+    default:
+      return {
+        icon: Minus,
+        textClass: "text-muted-foreground",
+        borderClass: "border-border/60",
+        bgClass: "bg-muted/30",
+      };
+  }
 }
 
 function CardComment({
